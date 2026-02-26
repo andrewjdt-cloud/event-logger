@@ -1,1 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CP Competition Time Logger</title>
 
+<style>
+body {
+  font-family: system-ui, sans-serif;
+  background: #111;
+  color: #fff;
+  margin: 0;
+  padding: 16px;
+  text-align: center;
+}
+
+.header {
+  margin-bottom: 12px;
+}
+.event-name {
+  font-size: 20px;
+  font-weight: 600;
+}
+.event-location {
+  font-size: 13px;
+  color: #aaa;
+}
+
+.controls {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin: 12px 0;
+}
+select, input, button {
+  font-size: 16px;
+  padding: 8px;
+  border-radius: 8px;
+  border: none;
+}
+select, input {
+  background: #222;
+  color: #fff;
+}
+
+.competitor {
+  margin: 18px 0;
+}
+.comp-number {
+  font-size: 42px;
+  font-weight: bold;
+}
+.comp-name {
+  font-size: 18px;
+  color: #8bc34a;
+}
+
+button.log {
+  width: 100%;
+  font-size: 22px;
+  padding: 16px;
+  border-radius: 14px;
+  background: #00c853;
+  color: #000;
+  margin-top: 10px;
+}
+button:disabled {
+  opacity: 0.4;
+}
+
+.extras {
+  margin-top: 12px;
+  text-align: left;
+}
+.status {
+  margin-top: 10px;
+  font-size: 14px;
+  color: #ffeb3b;
+}
+</style>
+</head>
+
+<body>
+
+<div class="header">
+  <div class="event-name" id="eventName">—</div>
+  <div class="event-location" id="eventLocation">—</div>
+</div>
+
+<div class="controls">
+  <select id="eventSelect"></select>
+  <select id="roundSelect"></select>
+</div>
+
+<div class="competitor">
+  <div class="comp-number" id="compNumber">—</div>
+  <div class="comp-name" id="compName">—</div>
+</div>
+
+<button class="log" id="logBtn">LOG ENTRY</button>
+
+<div class="extras">
+  <label>
+    <input type="checkbox" id="rerunChk"> Rerun
+  </label>
+  <select id="rerunReason" disabled>
+    <option value="">Reason</option>
+    <option>Wind</option>
+    <option>Technical</option>
+    <option>Course Entry</option>
+    <option>Other</option>
+  </select>
+  <input type="text" id="notes" placeholder="Notes (optional)">
+  <button id="undoBtn">Undo last</button>
+</div>
+
+<div class="status" id="statusText"></div>
+
+<script>
+/* ================= CONFIG ================= */
+const SHEET_ID = "1EsFTZZkAbdVCYu8wT_gR2V_l_knRAGSmD0F5X0PA3rE";
+const API_URL  = "https://script.google.com/macros/s/AKfycbwYs40Fhv2l6gfPRIxTeVqkd8pnu23bA3SDyrdPA05bClVbDrRmoHcSkVTmYgEvhn93yg/exec";
+const DEBOUNCE_MS = 3000;
+
+/* ============== AUTH PARAMS =============== */
+const params = new URLSearchParams(location.search);
+const logger = params.get("name");
+const token  = params.get("token");
+
+if (!logger || !token) {
+  alert("Missing name or token in URL");
+}
+
+/* ================= STATE ================== */
+let competitors = [];
+let index = 0;
+let lastActionTime = 0;
+let lastLogPayload = null;
+
+/* ================= HELPERS ================= */
+function parseGViz(t) {
+  return JSON.parse(t.substring(t.indexOf("{"), t.lastIndexOf("}") + 1));
+}
+function nowISO() {
+  return new Date().toISOString().replace("T"," ").substring(0,19);
+}
+
+/* =============== LOAD EVENT CONFIG =============== */
+async function loadEventConfig() {
+  const r = await fetch(
+    `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?gid=0&tqx=out:json`
+  );
+  const j = parseGViz(await r.text());
+  const cfg = {};
+  j.table.rows.forEach(row => {
+    cfg[row.c[0].v] = row.c[1]?.v || "";
+  });
+
+  eventName.textContent = cfg.EventName || "";
+  eventLocation.textContent = cfg.Location || "";
+
+  eventSelect.innerHTML = `<option>${cfg.EventName}</option>`;
+  roundSelect.innerHTML = `<option>${cfg.DefaultRound || 1}</option>`;
+}
+
+/* ============== LOAD COMPETITORS ============ */
+async function loadCompetitors() {
+  const r = await fetch(
+    `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?gid=0&tqx=out:json`
+  );
+  const j = parseGViz(await r.text());
+
+  competitors = j.table.rows.slice(1).map(r => ({
+    id: r.c[1]?.v,
+    name: r.c[2]?.v
+  }));
+
+  showCompetitor();
+}
+
+function showCompetitor() {
+  const c = competitors[index];
+  if (!c) return;
+  compNumber.textContent = c.id;
+  compName.textContent = c.name;
+}
+
+/* ================= LOG ENTRY ================= */
+logBtn.onclick = async () => {
+  if (Date.now() - lastActionTime < DEBOUNCE_MS) return;
+
+  const c = competitors[index];
+  if (!c) return;
+
+  const payload = {
+    logger,
+    token,
+    event: eventSelect.value,
+    round: roundSelect.value,
+    competitorId: c.id,
+    competitorName: c.name,
+    isRerun: rerunChk.checked,
+    rerunReason: rerunReason.value,
+    notes: notes.value,
+    action: "LOG"
+  };
+
+  lastLogPayload = payload;
+  lastActionTime = Date.now();
+
+  await fetch(API_URL, {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+
+  statusText.textContent = `Logged ${c.id} at ${nowISO()}`;
+
+  index++;
+  showCompetitor();
+};
+
+/* ================= UNDO ================= */
+undoBtn.onclick = async () => {
+  if (!lastLogPayload) return;
+
+  await fetch(API_URL, {
+    method: "POST",
+    body: JSON.stringify({
+      ...lastLogPayload,
+      action: "UNDO"
+    })
+  });
+
+  statusText.textContent = "Last entry undone";
+};
+
+/* ================= RERUN UI ================= */
+rerunChk.onchange = () => {
+  rerunReason.disabled = !rerunChk.checked;
+};
+
+/* ================= BOOT ================= */
+(async () => {
+  await loadEventConfig();
+  await loadCompetitors();
+})();
+</script>
+
+</body>
+</html>
