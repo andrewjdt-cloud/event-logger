@@ -23,21 +23,25 @@ select,button,input{
 }
 select,input{background:#222;color:#fff}
 
-.competitor{margin:18px 0}
-.comp-number{font-size:42px;font-weight:bold}
-.comp-name{font-size:18px;color:#8bc34a}
-
 .nav{
   display:flex;gap:10px;justify-content:center;margin-bottom:10px;
 }
+
+.competitor{margin:18px 0}
+.comp-number{font-size:42px;font-weight:bold}
+.comp-name{font-size:18px;color:#8bc34a}
 
 button.log{
   width:100%;font-size:22px;padding:16px;
   border-radius:14px;background:#00c853;color:#000;
 }
+button.log:disabled{
+  opacity:0.4;
+}
 
 .extras{margin-top:12px;text-align:left}
 .status{margin-top:10px;font-size:14px;color:#ffeb3b}
+.closed{color:#ff5252;font-weight:bold}
 </style>
 </head>
 
@@ -46,6 +50,9 @@ button.log{
 <div class="header">
   <div class="event-name" id="eventName"></div>
   <div class="event-location" id="eventLocation"></div>
+  <div class="closed" id="closedNotice" style="display:none">
+    Event is currently CLOSED
+  </div>
 </div>
 
 <div class="controls">
@@ -99,7 +106,9 @@ const token=params.get("token");
 /* ===== STATE ===== */
 let competitors=[];
 let index=0;
+let completed={};
 let lastLogPayload=null;
+let eventOpen=true;
 
 /* ===== HELPERS ===== */
 function parseGViz(t){
@@ -108,19 +117,28 @@ function parseGViz(t){
 
 /* ===== EVENT CONFIG ===== */
 async function loadEventConfig(){
-  const r=await fetch(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?gid=${EVENTCONFIG_GID}&tqx=out:json`);
+  const r=await fetch(
+    `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?gid=${EVENTCONFIG_GID}&tqx=out:json`
+  );
   const j=parseGViz(await r.text());
-  j.table.rows.slice(1).forEach(r=>{
-    const k=(r.c[0]?.v||"").toString().trim();
-    const v=r.c[1]?.v||"";
-    if(k==="EventName") eventName.textContent=v;
-    if(k==="Location") eventLocation.textContent=v;
+  j.table.rows.forEach(r=>{
+    const key=(r.c[0]?.v||"").toString().trim();
+    const val=(r.c[1]?.v||"").toString().trim();
+    if(key==="EventName") eventName.textContent=val;
+    if(key==="Location") eventLocation.textContent=val;
+    if(key==="ActiveEvent" && val.toUpperCase()!=="YES"){
+      eventOpen=false;
+      logBtn.disabled=true;
+      closedNotice.style.display="block";
+    }
   });
 }
 
 /* ===== EVENTS ===== */
 async function loadEvents(){
-  const r=await fetch(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?gid=${EVENTS_GID}&tqx=out:json`);
+  const r=await fetch(
+    `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?gid=${EVENTS_GID}&tqx=out:json`
+  );
   const j=parseGViz(await r.text());
   eventSelect.innerHTML="";
   j.table.rows.slice(1).forEach(r=>{
@@ -135,12 +153,15 @@ async function loadEvents(){
 
 /* ===== ROUNDS ===== */
 async function loadRounds(){
-  const r=await fetch(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?gid=${ROUNDS_GID}&tqx=out:json`);
+  const r=await fetch(
+    `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?gid=${ROUNDS_GID}&tqx=out:json`
+  );
   const j=parseGViz(await r.text());
   roundSelect.innerHTML="";
   j.table.rows.slice(1).forEach(r=>{
-    const v=r.c[0]?.v;
-    if(v){
+    const cell=r.c[0];
+    const v=cell?.f ?? cell?.v;
+    if(v!==undefined && v!==""){
       const o=document.createElement("option");
       o.textContent=String(v);
       roundSelect.appendChild(o);
@@ -148,29 +169,32 @@ async function loadRounds(){
   });
 }
 
-/* ===== LAST USED CONTEXT ===== */
+/* ===== RESUME FROM TIMELOG (LOG/UNDO AWARE) ===== */
 async function resumeFromTimeLog(){
-  const r=await fetch(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?gid=${TIMELOG_GID}&tqx=out:json`);
+  const r=await fetch(
+    `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?gid=${TIMELOG_GID}&tqx=out:json`
+  );
   const j=parseGViz(await r.text());
-  const rows=j.table.rows;
-  let lastComp=null;
-  for(let i=rows.length-1;i>=0;i--){
-    if(rows[i].c[9]?.v==="LOG"){
-      eventSelect.value=rows[i].c[1]?.v||eventSelect.value;
-      roundSelect.value=rows[i].c[2]?.v||roundSelect.value;
-      lastComp=rows[i].c[3]?.v;
-      break;
+  j.table.rows.forEach(r=>{
+    const comp=r.c[3]?.v;
+    const action=r.c[9]?.v;
+    if(!comp||!action) return;
+    if(action==="LOG") completed[comp]=true;
+    if(action==="UNDO") completed[comp]=false;
+    if(action==="LOG"){
+      eventSelect.value=r.c[1]?.v||eventSelect.value;
+      roundSelect.value=r.c[2]?.v||roundSelect.value;
     }
-  }
-  if(lastComp){
-    const idx=competitors.findIndex(c=>String(c.number)===String(lastComp));
-    if(idx>=0) index=Math.min(idx+1,competitors.length-1);
-  }
+  });
+  const next=competitors.findIndex(c=>!completed[c.number]);
+  index=next>=0?next:competitors.length-1;
 }
 
 /* ===== COMPETITORS ===== */
 async function loadCompetitors(){
-  const r=await fetch(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?gid=${COMPETITORS_GID}&tqx=out:json`);
+  const r=await fetch(
+    `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?gid=${COMPETITORS_GID}&tqx=out:json`
+  );
   const j=parseGViz(await r.text());
   const h=j.table.cols.map(c=>c.label);
   const hi={
@@ -188,7 +212,7 @@ async function loadCompetitors(){
 /* ===== UI ===== */
 function showCompetitor(){
   const c=competitors[index];
-  if(!c)return;
+  if(!c) return;
   compNumber.textContent=c.number;
   compName.textContent=c.name;
 }
@@ -198,8 +222,9 @@ nextBtn.onclick=()=>{ if(index<competitors.length-1){index++;showCompetitor();} 
 
 /* ===== LOGGING ===== */
 logBtn.onclick=async()=>{
+  if(!eventOpen) return;
   const c=competitors[index];
-  if(!c)return;
+  if(!c) return;
   lastLogPayload={
     logger,token,
     event:eventSelect.value,
@@ -212,14 +237,16 @@ logBtn.onclick=async()=>{
     action:"LOG"
   };
   await fetch(API_URL,{method:"POST",body:JSON.stringify(lastLogPayload)});
-  statusText.textContent=`Logged ${c.number}`;
+  completed[c.number]=true;
   index=Math.min(index+1,competitors.length-1);
   showCompetitor();
+  statusText.textContent=`Logged ${c.number}`;
 };
 
 undoBtn.onclick=async()=>{
-  if(!lastLogPayload)return;
+  if(!lastLogPayload) return;
   await fetch(API_URL,{method:"POST",body:JSON.stringify({...lastLogPayload,action:"UNDO"})});
+  completed[lastLogPayload.competitorId]=false;
   index=Math.max(index-1,0);
   showCompetitor();
   statusText.textContent="Last entry undone";
