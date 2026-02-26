@@ -34,7 +34,8 @@ button.log{
 }
 button.log:disabled{opacity:0.4}
 
-.status{margin-top:10px;font-size:14px;color:#ffeb3b}
+.extras{margin-top:12px;text-align:left}
+.status{margin-top:10px;font-size:14px;color:#ff5252}
 </style>
 </head>
 
@@ -65,6 +66,18 @@ button.log:disabled{opacity:0.4}
 
 <button class="log" id="logBtn">LOG ENTRY</button>
 
+<div class="extras">
+  <label><input type="checkbox" id="rerunChk"> Rerun</label>
+  <select id="rerunReason" disabled>
+    <option value="">Reason</option>
+    <option>Wind</option>
+    <option>Technical</option>
+    <option>Course Entry</option>
+    <option>Other</option>
+  </select>
+  <button id="undoBtn">Undo last</button>
+</div>
+
 <div class="status" id="statusText"></div>
 
 <script>
@@ -77,24 +90,22 @@ const ROUNDS_GID=1872371459;
 const COMPETITORS_GID=1455640270;
 const TIMELOG_GID=1894563340;
 
-let competitors=[], index=0, completed={}, eventOpen=true;
+let competitors=[], index=0, completed={}, lastLog=null, eventOpen=true;
 
 function parseGViz(t){
   return JSON.parse(t.substring(t.indexOf("{"),t.lastIndexOf("}")+1));
 }
 
-/* ===== EVENT CONFIG (HEADER AWARE) ===== */
+/* EVENT CONFIG */
 async function loadEventConfig(){
   const r=await fetch(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?gid=${EVENTCONFIG_GID}&tqx=out:json`);
   const j=parseGViz(await r.text());
-
   j.table.rows.slice(1).forEach(r=>{
-    const key=(r.c[0]?.v||"").trim();
-    const val=(r.c[1]?.v||"").trim();
-
-    if(key==="EventName") eventName.textContent=val;
-    if(key==="Location") eventLocation.textContent=val;
-    if(key==="ActiveEvent" && val.toUpperCase()!=="YES"){
+    const k=(r.c[0]?.v||"").trim();
+    const v=(r.c[1]?.v||"").trim();
+    if(k==="EventName") eventName.textContent=v;
+    if(k==="Location") eventLocation.textContent=v;
+    if(k==="ActiveEvent" && v.toUpperCase()!=="YES"){
       eventOpen=false;
       logBtn.disabled=true;
       closedNotice.style.display="block";
@@ -102,54 +113,37 @@ async function loadEventConfig(){
   });
 }
 
-/* ===== EVENTS ===== */
+/* EVENTS */
 async function loadEvents(){
   const r=await fetch(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?gid=${EVENTS_GID}&tqx=out:json`);
   const j=parseGViz(await r.text());
   eventSelect.innerHTML="";
   j.table.rows.slice(1).forEach(r=>{
-    const v=r.c[0]?.v;
-    if(v){
+    if(r.c[0]?.v){
       const o=document.createElement("option");
-      o.textContent=String(v);
+      o.textContent=String(r.c[0].v);
       eventSelect.appendChild(o);
     }
   });
 }
 
-/* ===== ROUNDS (ROBUST) ===== */
+/* ROUNDS */
 async function loadRounds(){
-  const r = await fetch(
-    `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?gid=${ROUNDS_GID}&tqx=out:json`
-  );
-  const j = parseGViz(await r.text());
-
-  roundSelect.innerHTML = "";
-
-  // Skip header row explicitly
-  j.table.rows.slice(1).forEach(row => {
-    const cell = row.c[0];
-
-    if (!cell) return;
-
-    // GViz-safe extraction
-    let value = "";
-    if (cell.f !== undefined && cell.f !== null) {
-      value = String(cell.f);
-    } else if (cell.v !== undefined && cell.v !== null) {
-      value = String(cell.v);
+  const r=await fetch(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?gid=${ROUNDS_GID}&tqx=out:json`);
+  const j=parseGViz(await r.text());
+  roundSelect.innerHTML="";
+  j.table.rows.slice(1).forEach(r=>{
+    const cell=r.c[0];
+    const v=cell?.f ?? cell?.v;
+    if(v!==undefined && v!==null && String(v).trim()){
+      const o=document.createElement("option");
+      o.textContent=String(v);
+      roundSelect.appendChild(o);
     }
-
-    value = value.trim();
-    if (!value) return;
-
-    const opt = document.createElement("option");
-    opt.textContent = value;
-    roundSelect.appendChild(opt);
   });
 }
 
-/* ===== COMPETITORS ===== */
+/* COMPETITORS */
 async function loadCompetitors(){
   const r=await fetch(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?gid=${COMPETITORS_GID}&tqx=out:json`);
   const j=parseGViz(await r.text());
@@ -166,7 +160,7 @@ async function loadCompetitors(){
   })).sort((a,b)=>a.order-b.order);
 }
 
-/* ===== RESUME (LOG/UNDO AWARE) ===== */
+/* RESUME */
 async function resumeFromTimeLog(){
   const r=await fetch(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?gid=${TIMELOG_GID}&tqx=out:json`);
   const j=parseGViz(await r.text());
@@ -178,8 +172,8 @@ async function resumeFromTimeLog(){
     if(action==="LOG") completed[comp]=true;
     if(action==="UNDO") completed[comp]=false;
     if(action==="LOG"){
-      eventSelect.value=r.c[1]?.v||eventSelect.value;
-      roundSelect.value=r.c[2]?.v||roundSelect.value;
+      eventSelect.value=String(r.c[1]?.v||eventSelect.value);
+      roundSelect.value=String(r.c[2]?.v||roundSelect.value);
     }
   });
 
@@ -187,6 +181,7 @@ async function resumeFromTimeLog(){
   index=next>=0?next:competitors.length-1;
 }
 
+/* UI */
 function showCompetitor(){
   const c=competitors[index];
   if(c){
@@ -198,22 +193,42 @@ function showCompetitor(){
 prevBtn.onclick=()=>{ if(index>0){index--;showCompetitor();} };
 nextBtn.onclick=()=>{ if(index<competitors.length-1){index++;showCompetitor();} };
 
+rerunChk.onchange=()=>rerunReason.disabled=!rerunChk.checked;
+
+/* LOG */
 logBtn.onclick=async()=>{
   if(!eventOpen) return;
   const c=competitors[index];
   if(!c) return;
-  await fetch(API_URL,{method:"POST",body:JSON.stringify({
+
+  lastLog={
     event:eventSelect.value,
     round:roundSelect.value,
     competitorId:c.number,
     competitorName:c.name,
+    isRerun:rerunChk.checked,
+    rerunReason:rerunReason.value,
     action:"LOG"
-  })});
+  };
+
+  await fetch(API_URL,{method:"POST",body:JSON.stringify(lastLog)});
   completed[c.number]=true;
-  index++;
+  index=Math.min(index+1,competitors.length-1);
   showCompetitor();
+  statusText.textContent=`Logged ${c.number}`;
 };
 
+/* UNDO */
+undoBtn.onclick=async()=>{
+  if(!lastLog) return;
+  await fetch(API_URL,{method:"POST",body:JSON.stringify({...lastLog,action:"UNDO"})});
+  completed[lastLog.competitorId]=false;
+  index=Math.max(index-1,0);
+  showCompetitor();
+  statusText.textContent="Last entry undone";
+};
+
+/* BOOT */
 (async()=>{
   await loadEventConfig();
   await loadEvents();
