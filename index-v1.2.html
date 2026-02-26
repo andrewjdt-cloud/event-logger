@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CP Competition Time Logger</title>
+
+<style>
+body {
+  font-family: system-ui, sans-serif;
+  background: #111;
+  color: #fff;
+  margin: 0;
+  padding: 16px;
+  text-align: center;
+}
+.header { margin-bottom: 12px; }
+.event-name { font-size: 20px; font-weight: 600; }
+.event-location { font-size: 13px; color: #aaa; }
+
+.controls {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin: 12px 0;
+}
+select, input, button {
+  font-size: 16px;
+  padding: 8px;
+  border-radius: 8px;
+  border: none;
+}
+select, input { background: #222; color: #fff; }
+
+.competitor { margin: 18px 0; }
+.comp-number { font-size: 42px; font-weight: bold; }
+.comp-name { font-size: 18px; color: #8bc34a; }
+
+button.log {
+  width: 100%;
+  font-size: 22px;
+  padding: 16px;
+  border-radius: 14px;
+  background: #00c853;
+  color: #000;
+}
+
+.extras { margin-top: 12px; text-align: left; }
+.status { margin-top: 10px; font-size: 14px; color: #ffeb3b; }
+</style>
+</head>
+
+<body>
+
+<div class="header">
+  <div class="event-name" id="eventName"></div>
+  <div class="event-location" id="eventLocation"></div>
+</div>
+
+<div class="controls">
+  <select id="eventSelect"></select>
+  <select id="roundSelect"></select>
+</div>
+
+<div class="competitor">
+  <div class="comp-number" id="compNumber">—</div>
+  <div class="comp-name" id="compName">—</div>
+</div>
+
+<button class="log" id="logBtn">LOG ENTRY</button>
+
+<div class="extras">
+  <label><input type="checkbox" id="rerunChk"> Rerun</label>
+  <select id="rerunReason" disabled>
+    <option value="">Reason</option>
+    <option>Wind</option>
+    <option>Technical</option>
+    <option>Course Entry</option>
+    <option>Other</option>
+  </select>
+  <input type="text" id="notes" placeholder="Notes (optional)">
+  <button id="undoBtn">Undo last</button>
+</div>
+
+<div class="status" id="statusText"></div>
+
+<script>
+/* ================= CONFIG ================= */
+const SHEET_ID = "1EsFTZZkAbdVCYu8wT_gR2V_l_knRAGSmD0F5X0PA3rE";
+const API_URL  = "https://script.google.com/macros/s/AKfycbwYs40Fhv2l6gfPRIxTeVqkd8pnu23bA3SDyrdPA05bClVbDrRmoHcSkVTmYgEvhn93yg/exec";
+
+const EVENTCONFIG_GID = 0;
+const EVENTS_GID = 1157267667;
+const ROUNDS_GID = 1872371459;
+const COMPETITORS_GID = 1455640270;
+const TIMELOG_GID = 1894563340;
+
+/* ================= AUTH ================= */
+const params = new URLSearchParams(location.search);
+const logger = params.get("name");
+const token  = params.get("token");
+
+/* ================= STATE ================= */
+let competitors = [];
+let index = 0;
+let lastLogPayload = null;
+
+/* ================= HELPERS ================= */
+function parseGViz(t){
+  return JSON.parse(t.substring(t.indexOf("{"), t.lastIndexOf("}") + 1));
+}
+
+/* ================= EVENT CONFIG ================= */
+async function loadEventConfig(){
+  const r = await fetch(
+    `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?gid=${EVENTCONFIG_GID}&tqx=out:json`
+  );
+  const j = parseGViz(await r.text());
+  const cfg = {};
+  j.table.rows.forEach(r => cfg[r.c[0]?.v] = r.c[1]?.v || "");
+  eventName.textContent = cfg.EventName || "";
+  eventLocation.textContent = cfg.Location || "";
+}
+
+/* ================= EVENTS ================= */
+async function loadEvents(){
+  const r = await fetch(
+    `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?gid=${EVENTS_GID}&tqx=out:json`
+  );
+  const j = parseGViz(await r.text());
+  eventSelect.innerHTML = "";
+  j.table.rows.forEach(r=>{
+    const v = r.c[0]?.v;
+    if(v){
+      const o = document.createElement("option");
+      o.textContent = v;
+      eventSelect.appendChild(o);
+    }
+  });
+}
+
+/* ================= ROUNDS ================= */
+async function loadRounds(){
+  const r = await fetch(
+    `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?gid=${ROUNDS_GID}&tqx=out:json`
+  );
+  const j = parseGViz(await r.text());
+  roundSelect.innerHTML = "";
+  j.table.rows.forEach(r=>{
+    const v = r.c[0]?.v;
+    if(v){
+      const o = document.createElement("option");
+      o.textContent = v;
+      roundSelect.appendChild(o);
+    }
+  });
+}
+
+/* ================= LAST USED EVENT / ROUND ================= */
+async function applyLastUsedContext(){
+  const r = await fetch(
+    `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?gid=${TIMELOG_GID}&tqx=out:json`
+  );
+  const j = parseGViz(await r.text());
+  const rows = j.table.rows;
+
+  for(let i = rows.length - 1; i >= 0; i--){
+    const ev = rows[i].c[1]?.v;
+    const rd = rows[i].c[2]?.v;
+    if(ev && rd){
+      eventSelect.value = ev;
+      roundSelect.value = rd;
+      break;
+    }
+  }
+}
+
+/* ================= COMPETITORS ================= */
+async function loadCompetitors(){
+  const r = await fetch(
+    `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?gid=${COMPETITORS_GID}&tqx=out:json`
+  );
+  const j = parseGViz(await r.text());
+  competitors = j.table.rows.map(r=>({
+    id: r.c[1]?.v,
+    name: r.c[2]?.v
+  })).filter(c=>c.id);
+  showCompetitor();
+}
+
+function showCompetitor(){
+  const c = competitors[index];
+  if(!c) return;
+  compNumber.textContent = c.id;
+  compName.textContent = c.name;
+}
+
+/* ================= LOGGING ================= */
+logBtn.onclick = async ()=>{
+  const c = competitors[index];
+  if(!c) return;
+
+  const payload = {
+    logger, token,
+    event: eventSelect.value,
+    round: roundSelect.value,
+    competitorId: c.id,
+    competitorName: c.name,
+    isRerun: rerunChk.checked,
+    rerunReason: rerunReason.value,
+    notes: notes.value,
+    action: "LOG"
+  };
+
+  lastLogPayload = payload;
+  await fetch(API_URL,{ method:"POST", body: JSON.stringify(payload) });
+
+  statusText.textContent = `Logged ${c.id}`;
+  index++;
+  showCompetitor();
+};
+
+undoBtn.onclick = async ()=>{
+  if(!lastLogPayload) return;
+  await fetch(API_URL,{
+    method:"POST",
+    body: JSON.stringify({ ...lastLogPayload, action:"UNDO" })
+  });
+  statusText.textContent = "Last entry undone";
+};
+
+rerunChk.onchange = ()=> rerunReason.disabled = !rerunChk.checked;
+
+/* ================= BOOT ================= */
+(async()=>{
+  await loadEventConfig();
+  await loadEvents();
+  await loadRounds();
+  await applyLastUsedContext();
+  await loadCompetitors();
+})();
+</script>
+
+</body>
+</html>
