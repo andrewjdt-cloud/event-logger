@@ -119,17 +119,33 @@ async function loadEvents(){
 
 /* ===== ROUNDS (ROBUST) ===== */
 async function loadRounds(){
-  const r=await fetch(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?gid=${ROUNDS_GID}&tqx=out:json`);
-  const j=parseGViz(await r.text());
-  roundSelect.innerHTML="";
-  j.table.rows.slice(1).forEach(r=>{
-    const cell=r.c[0];
-    const v=cell?.f ?? cell?.v;
-    if(v!==undefined && v!==null && v!==""){
-      const o=document.createElement("option");
-      o.textContent=String(v);
-      roundSelect.appendChild(o);
+  const r = await fetch(
+    `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?gid=${ROUNDS_GID}&tqx=out:json`
+  );
+  const j = parseGViz(await r.text());
+
+  roundSelect.innerHTML = "";
+
+  // Skip header row explicitly
+  j.table.rows.slice(1).forEach(row => {
+    const cell = row.c[0];
+
+    if (!cell) return;
+
+    // GViz-safe extraction
+    let value = "";
+    if (cell.f !== undefined && cell.f !== null) {
+      value = String(cell.f);
+    } else if (cell.v !== undefined && cell.v !== null) {
+      value = String(cell.v);
     }
+
+    value = value.trim();
+    if (!value) return;
+
+    const opt = document.createElement("option");
+    opt.textContent = value;
+    roundSelect.appendChild(opt);
   });
 }
 
