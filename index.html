@@ -81,6 +81,7 @@ button.log:disabled{opacity:0.4}
 <div class="status" id="statusText"></div>
 
 <script>
+/* ================= CONFIG ================= */
 const SHEET_ID="1EsFTZZkAbdVCYu8wT_gR2V_l_knRAGSmD0F5X0PA3rE";
 const API_URL="https://script.google.com/macros/s/AKfycbwYs40Fhv2l6gfPRIxTeVqkd8pnu23bA3SDyrdPA05bClVbDrRmoHcSkVTmYgEvhn93yg/exec";
 
@@ -90,13 +91,23 @@ const ROUNDS_GID=1872371459;
 const COMPETITORS_GID=1455640270;
 const TIMELOG_GID=1894563340;
 
+/* ===== AUTH FROM URL ===== */
+const params = new URLSearchParams(location.search);
+const logger = params.get("logger");
+const token  = params.get("token");
+
+if (!logger || !token) {
+  alert("Missing logger or token in URL");
+}
+
+/* ================= STATE ================= */
 let competitors=[], index=0, completed={}, lastLog=null, eventOpen=true;
 
 function parseGViz(t){
   return JSON.parse(t.substring(t.indexOf("{"),t.lastIndexOf("}")+1));
 }
 
-/* EVENT CONFIG */
+/* ================= LOADERS ================= */
 async function loadEventConfig(){
   const r=await fetch(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?gid=${EVENTCONFIG_GID}&tqx=out:json`);
   const j=parseGViz(await r.text());
@@ -113,7 +124,6 @@ async function loadEventConfig(){
   });
 }
 
-/* EVENTS */
 async function loadEvents(){
   const r=await fetch(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?gid=${EVENTS_GID}&tqx=out:json`);
   const j=parseGViz(await r.text());
@@ -127,7 +137,6 @@ async function loadEvents(){
   });
 }
 
-/* ROUNDS */
 async function loadRounds(){
   const r=await fetch(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?gid=${ROUNDS_GID}&tqx=out:json`);
   const j=parseGViz(await r.text());
@@ -143,7 +152,6 @@ async function loadRounds(){
   });
 }
 
-/* COMPETITORS */
 async function loadCompetitors(){
   const r=await fetch(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?gid=${COMPETITORS_GID}&tqx=out:json`);
   const j=parseGViz(await r.text());
@@ -160,11 +168,9 @@ async function loadCompetitors(){
   })).sort((a,b)=>a.order-b.order);
 }
 
-/* RESUME */
 async function resumeFromTimeLog(){
   const r=await fetch(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?gid=${TIMELOG_GID}&tqx=out:json`);
   const j=parseGViz(await r.text());
-
   j.table.rows.forEach(r=>{
     const comp=r.c[3]?.v;
     const action=r.c[9]?.v;
@@ -176,12 +182,11 @@ async function resumeFromTimeLog(){
       roundSelect.value=String(r.c[2]?.v||roundSelect.value);
     }
   });
-
   const next=competitors.findIndex(c=>!completed[c.number]);
   index=next>=0?next:competitors.length-1;
 }
 
-/* UI */
+/* ================= UI ================= */
 function showCompetitor(){
   const c=competitors[index];
   if(c){
@@ -192,33 +197,41 @@ function showCompetitor(){
 
 prevBtn.onclick=()=>{ if(index>0){index--;showCompetitor();} };
 nextBtn.onclick=()=>{ if(index<competitors.length-1){index++;showCompetitor();} };
-
 rerunChk.onchange=()=>rerunReason.disabled=!rerunChk.checked;
 
-/* LOG */
+/* ================= LOG ================= */
 logBtn.onclick=async()=>{
-  if(!eventOpen) return;
+  if(!eventOpen || !logger || !token) return;
   const c=competitors[index];
   if(!c) return;
 
   lastLog={
+    logger,
+    token,
     event:eventSelect.value,
     round:roundSelect.value,
     competitorId:c.number,
     competitorName:c.name,
     isRerun:rerunChk.checked,
     rerunReason:rerunReason.value,
+    notes:"",
     action:"LOG"
   };
 
-  await fetch(API_URL,{method:"POST",body:JSON.stringify(lastLog)});
+  const res = await fetch(API_URL,{method:"POST",body:JSON.stringify(lastLog)});
+  const txt = await res.text();
+  if(txt.includes("error")){
+    statusText.textContent=txt;
+    return;
+  }
+
   completed[c.number]=true;
   index=Math.min(index+1,competitors.length-1);
   showCompetitor();
   statusText.textContent=`Logged ${c.number}`;
 };
 
-/* UNDO */
+/* ================= UNDO ================= */
 undoBtn.onclick=async()=>{
   if(!lastLog) return;
   await fetch(API_URL,{method:"POST",body:JSON.stringify({...lastLog,action:"UNDO"})});
@@ -228,7 +241,7 @@ undoBtn.onclick=async()=>{
   statusText.textContent="Last entry undone";
 };
 
-/* BOOT */
+/* ================= BOOT ================= */
 (async()=>{
   await loadEventConfig();
   await loadEvents();
