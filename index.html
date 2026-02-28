@@ -278,14 +278,14 @@ function startCountdown(){
 }
 
 /* LOG */
-logBtn.onclick = async () => {
+logBtn.onclick = () => {
   if (!eventOpen) return;
   const c = competitors[index];
   if (!c) return;
 
   lastLog = {
-    logger,
-    token,
+    logger: logger,
+    token: token,
     event: eventSelect.value,
     round: roundSelect.value,
     competitorId: c.number,
@@ -296,6 +296,22 @@ logBtn.onclick = async () => {
     action: "LOG"
   };
 
+  // Immediate UI feedback
+  startCountdown();
+
+  // Fire-and-forget POST (Apps Script compatible)
+  try {
+    fetch(API_URL, {
+      method: "POST",
+      contentType: "application/json",
+      body: JSON.stringify(lastLog)
+    });
+  } catch (e) {
+    console.error(e);
+    statusText.textContent = "Logging failed";
+  }
+};
+  
   // 1️⃣ Start UI feedback immediately
   startCountdown();
 
