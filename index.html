@@ -17,10 +17,10 @@ body{
 .closed{color:#ff5252;font-weight:bold}
 
 .controls{display:flex;gap:8px;justify-content:center;margin:12px 0}
-select,button,input{
+select,button{
   font-size:16px;padding:8px;border-radius:8px;border:none
 }
-select,input{background:#222;color:#fff}
+select{background:#222;color:#fff}
 
 .nav{display:flex;gap:10px;justify-content:center;margin-bottom:10px}
 
@@ -34,7 +34,7 @@ button.log{
 }
 
 .extras{margin-top:12px;text-align:left}
-.status{margin-top:10px;font-size:14px;color:#ff5252}
+.status{margin-top:10px;font-size:14px;color:#ffeb3b}
 
 /* SUCCESS OVERLAY */
 .success-overlay{
@@ -105,9 +105,8 @@ button.log{
 </div>
 
 <script>
-/* ================= CONFIG ================= */
 const SHEET_ID="1EsFTZZkAbdVCYu8wT_gR2V_l_knRAGSmD0F5X0PA3rE";
-const API_URL="https://script.google.com/macros/s/AKfycbxQYRLg5uwFOmsCcfThuX8qX4LGNjg_HIIqGKeOReLDdT4Yiq6Z3ASR9kZ4npBb5b_b/exec";
+const API_URL="https://script.google.com/macros/s/AKfycbyCAYRIjhXoDRqYKeoTKNpQlGUzDk6Jv6BHZxAxL1e40Ufw1tzuGqoDHZST1-Vo9yxgvQ/exec";
 
 const EVENTCONFIG_GID=0;
 const EVENTS_GID=1157267667;
@@ -116,20 +115,16 @@ const COMPETITORS_GID=1455640270;
 const TIMELOG_GID=1894563340;
 const RERUN_GID=110041342;
 
-/* AUTH */
 const params=new URLSearchParams(location.search);
 const logger=params.get("logger");
 const token=params.get("token");
 
-/* STATE */
 let competitors=[], index=0, completed={}, lastLog=null, eventOpen=true;
 
-/* HELPERS */
 function parseGViz(t){
   return JSON.parse(t.substring(t.indexOf("{"),t.lastIndexOf("}")+1));
 }
 
-/* LOADERS */
 async function loadEventConfig(){
   const j=parseGViz(await (await fetch(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?gid=${EVENTCONFIG_GID}&tqx=out:json`)).text());
   j.table.rows.slice(1).forEach(r=>{
@@ -168,18 +163,13 @@ async function loadCompetitors(){
 async function recomputeProgression(){
   completed={};
   const j=parseGViz(await (await fetch(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?gid=${TIMELOG_GID}&tqx=out:json`)).text());
-
   j.table.rows.forEach(r=>{
-    if(String(r.c[1]?.v)!==String(eventSelect.value)) return;
-    if(String(r.c[2]?.v)!==String(roundSelect.value)) return;
-    const comp=r.c[3]?.v;
-    const act=r.c[9]?.v;
-    if(act==="LOG") completed[comp]=true;
-    if(act==="UNDO") completed[comp]=false;
+    if(r.c[1]?.v==eventSelect.value && r.c[2]?.v==roundSelect.value){
+      if(r.c[9]?.v==="LOG") completed[r.c[3]?.v]=true;
+      if(r.c[9]?.v==="UNDO") completed[r.c[3]?.v]=false;
+    }
   });
-
-  const next=competitors.findIndex(c=>!completed[c.number]);
-  index=next>=0?next:competitors.length-1;
+  index=Math.max(0,competitors.findIndex(c=>!completed[c.number]));
   showCompetitor();
 }
 
@@ -191,20 +181,13 @@ function showCompetitor(){
   }
 }
 
-/* EVENTS */
-prevBtn.onclick=()=>{if(index>0){index--;showCompetitor();}};
-nextBtn.onclick=()=>{if(index<competitors.length-1){index++;showCompetitor();}};
-rerunChk.onchange=()=>rerunReason.disabled=!rerunChk.checked;
-eventSelect.onchange=recomputeProgression;
-roundSelect.onchange=recomputeProgression;
-
-/* SUCCESS */
 function startCountdown(){
   successOverlay.classList.remove("hidden");
   let n=3;
   countdownText.textContent=n;
   const iv=setInterval(()=>{
-    n--; countdownText.textContent=n;
+    n--;
+    countdownText.textContent=n;
     if(n===0){
       clearInterval(iv);
       successOverlay.classList.add("hidden");
@@ -213,15 +196,12 @@ function startCountdown(){
   },1000);
 }
 
-/* LOG */
-logBtn.onclick=async()=>{
+logBtn.onclick=()=>{
   if(!eventOpen) return;
   const c=competitors[index];
   if(!c) return;
 
-  statusText.textContent="";
-
-  const payload={
+  lastLog={
     logger, token,
     event:eventSelect.value,
     round:roundSelect.value,
@@ -233,41 +213,32 @@ logBtn.onclick=async()=>{
     action:"LOG"
   };
 
-  try{
-    const res=await fetch(API_URL,{
-      method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body:JSON.stringify(payload)
-    });
-    const json=await res.json();
-    if(!json.ok) throw new Error(json.error||"Rejected");
+  startCountdown();
 
-    lastLog=payload;
-    startCountdown();
+  fetch(API_URL,{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify(lastLog)
+  });
 
-  }catch(e){
-    console.error(e);
-    statusText.textContent="Logging error — check connection";
-  }
+  statusText.textContent="Logged";
 };
 
-/* UNDO */
-undoBtn.onclick=async()=>{
+undoBtn.onclick=()=>{
   if(!lastLog) return;
-  try{
-    await fetch(API_URL,{
-      method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({...lastLog,action:"UNDO"})
-    });
-    statusText.textContent="Last entry undone";
-    recomputeProgression();
-  }catch(e){
-    statusText.textContent="Undo failed";
-  }
+  fetch(API_URL,{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({...lastLog,action:"UNDO"})
+  });
+  statusText.textContent="Last entry undone";
+  recomputeProgression();
 };
 
-/* BOOT */
+rerunChk.onchange=()=>rerunReason.disabled=!rerunChk.checked;
+eventSelect.onchange=recomputeProgression;
+roundSelect.onchange=recomputeProgression;
+
 (async()=>{
   await loadEventConfig();
   await loadSimpleList(EVENTS_GID,eventSelect);
@@ -277,6 +248,5 @@ undoBtn.onclick=async()=>{
   await recomputeProgression();
 })();
 </script>
-
 </body>
 </html>
