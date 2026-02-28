@@ -32,12 +32,11 @@ button.log{
   width:100%;font-size:22px;padding:16px;
   border-radius:14px;background:#00c853;color:#000
 }
-button.log:disabled{opacity:0.4}
 
 .extras{margin-top:12px;text-align:left}
 .status{margin-top:10px;font-size:14px;color:#ff5252}
 
-/* SUCCESS OVERLAY (from Freestyle) */
+/* SUCCESS OVERLAY */
 .success-overlay{
   position:fixed;inset:0;
   background:rgba(0,0,0,0.7);
@@ -47,20 +46,14 @@ button.log:disabled{opacity:0.4}
 }
 .success-overlay.hidden{display:none}
 
-.success-tick{
-  width:96px;height:96px;margin-bottom:16px;
-}
-.success-tick svg{
-  width:100%;height:100%;
-  stroke:#00e676;stroke-width:8;fill:none;
-}
+.success-tick{width:96px;height:96px;margin-bottom:16px}
+.success-tick svg{stroke:#00e676;stroke-width:8;fill:none}
 
 .countdown{
   font-size:72px;font-weight:bold;
   color:#ffeb3b;
   animation:pulse 1s infinite;
 }
-
 @keyframes pulse{
   0%{transform:scale(1)}
   50%{transform:scale(1.15)}
@@ -98,20 +91,15 @@ button.log:disabled{opacity:0.4}
 
 <div class="extras">
   <label><input type="checkbox" id="rerunChk"> Rerun</label>
-  <select id="rerunReason" disabled>
-    <option value="">Reason</option>
-  </select>
+  <select id="rerunReason" disabled></select>
   <button id="undoBtn">Undo last</button>
 </div>
 
 <div class="status" id="statusText"></div>
 
-<!-- SUCCESS OVERLAY -->
 <div class="success-overlay hidden" id="successOverlay">
   <div class="success-tick">
-    <svg viewBox="0 0 52 52">
-      <path d="M14 27 L22 35 L38 17"/>
-    </svg>
+    <svg viewBox="0 0 52 52"><path d="M14 27 L22 35 L38 17"/></svg>
   </div>
   <div class="countdown" id="countdownText">3</div>
 </div>
@@ -143,103 +131,52 @@ function parseGViz(t){
 
 /* LOADERS */
 async function loadEventConfig(){
-  const r=await fetch(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?gid=${EVENTCONFIG_GID}&tqx=out:json`);
-  const j=parseGViz(await r.text());
+  const j=parseGViz(await (await fetch(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?gid=${EVENTCONFIG_GID}&tqx=out:json`)).text());
   j.table.rows.slice(1).forEach(r=>{
-    const k=(r.c[0]?.v||"").trim();
-    const v=(r.c[1]?.v||"").trim();
+    const k=r.c[0]?.v, v=r.c[1]?.v;
     if(k==="EventName") eventName.textContent=v;
     if(k==="Location") eventLocation.textContent=v;
-    if(k==="ActiveEvent" && v.toUpperCase()!=="YES"){
+    if(k==="ActiveEvent" && String(v).toUpperCase()!=="YES"){
       eventOpen=false;
-      logBtn.disabled=true;
       closedNotice.style.display="block";
     }
   });
 }
 
-async function loadEvents(){
-  const r=await fetch(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?gid=${EVENTS_GID}&tqx=out:json`);
-  const j=parseGViz(await r.text());
-  eventSelect.innerHTML="";
+async function loadSimpleList(gid, select){
+  const j=parseGViz(await (await fetch(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?gid=${gid}&tqx=out:json`)).text());
+  select.innerHTML="";
   j.table.rows.slice(1).forEach(r=>{
     if(r.c[0]?.v){
       const o=document.createElement("option");
       o.textContent=r.c[0].v;
-      eventSelect.appendChild(o);
-    }
-  });
-}
-
-async function loadRounds(){
-  const r=await fetch(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?gid=${ROUNDS_GID}&tqx=out:json`);
-  const j=parseGViz(await r.text());
-  roundSelect.innerHTML="";
-  j.table.rows.slice(1).forEach(r=>{
-    const v=r.c[0]?.f ?? r.c[0]?.v;
-    if(v){
-      const o=document.createElement("option");
-      o.textContent=String(v);
-      roundSelect.appendChild(o);
-    }
-  });
-}
-
-async function loadRerunReasons(){
-  if(!RERUN_GID) return;
-  const r=await fetch(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?gid=${RERUN_GID}&tqx=out:json`);
-  const j=parseGViz(await r.text());
-  rerunReason.innerHTML=`<option value="">Reason</option>`;
-  j.table.rows.slice(1).forEach(r=>{
-    if(r.c[0]?.v){
-      const o=document.createElement("option");
-      o.textContent=r.c[0].v;
-      rerunReason.appendChild(o);
+      select.appendChild(o);
     }
   });
 }
 
 async function loadCompetitors(){
-  const r=await fetch(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?gid=${COMPETITORS_GID}&tqx=out:json`);
-  const j=parseGViz(await r.text());
+  const j=parseGViz(await (await fetch(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?gid=${COMPETITORS_GID}&tqx=out:json`)).text());
   const h=j.table.cols.map(c=>c.label);
-  const hi={
-    order:h.indexOf("CompetitorOrder"),
-    number:h.indexOf("CompetitorNumber"),
-    name:h.indexOf("CompetitorName")
-  };
   competitors=j.table.rows.map(r=>({
-    order:r.c[hi.order]?.v,
-    number:r.c[hi.number]?.v,
-    name:r.c[hi.name]?.v
+    order:r.c[h.indexOf("CompetitorOrder")]?.v,
+    number:r.c[h.indexOf("CompetitorNumber")]?.v,
+    name:r.c[h.indexOf("CompetitorName")]?.v
   })).sort((a,b)=>a.order-b.order);
 }
 
-/* PROGRESSION */
 async function recomputeProgression(){
   completed={};
-  const r=await fetch(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?gid=${TIMELOG_GID}&tqx=out:json`);
-  const j=parseGViz(await r.text());
-
-  j.table.rows.forEach(row=>{
-    const ev=row.c[1]?.v;
-    const rd=row.c[2]?.v;
-    const comp=row.c[3]?.v;
-    const act=row.c[9]?.v;
-
-    if(String(ev)!==String(eventSelect.value)) return;
-    if(String(rd)!==String(roundSelect.value)) return;
-
-    if(act==="LOG") completed[comp]=true;
-    if(act==="UNDO") completed[comp]=false;
+  const j=parseGViz(await (await fetch(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?gid=${TIMELOG_GID}&tqx=out:json`)).text());
+  j.table.rows.forEach(r=>{
+    if(r.c[1]?.v==eventSelect.value && r.c[2]?.v==roundSelect.value){
+      completed[r.c[3]?.v]=r.c[9]?.v==="LOG";
+    }
   });
-
-  const next=competitors.findIndex(c=>!completed[c.number]);
-  index=next>=0?next:competitors.length-1;
+  index=Math.max(0,competitors.findIndex(c=>!completed[c.number]));
   showCompetitor();
 }
 
-/* UI */
 function showCompetitor(){
   const c=competitors[index];
   if(c){
@@ -248,103 +185,69 @@ function showCompetitor(){
   }
 }
 
-prevBtn.onclick=()=>{ if(index>0){index--;showCompetitor();} };
-nextBtn.onclick=()=>{ if(index<competitors.length-1){index++;showCompetitor();} };
+/* EVENTS */
+prevBtn.onclick=()=>{if(index>0){index--;showCompetitor();}};
+nextBtn.onclick=()=>{if(index<competitors.length-1){index++;showCompetitor();}};
 rerunChk.onchange=()=>rerunReason.disabled=!rerunChk.checked;
-
 eventSelect.onchange=recomputeProgression;
 roundSelect.onchange=recomputeProgression;
 
-/* SUCCESS FLOW */
+/* COUNTDOWN */
 function startCountdown(){
   successOverlay.classList.remove("hidden");
-  let n = 3;
-  countdownText.textContent = n;
-
-  const iv = setInterval(async () => {
-    n--;
-    countdownText.textContent = n;
-
-    if (n === 0) {
-      clearInterval(iv);
-      successOverlay.classList.add("hidden");
-
-      // Give Sheets a tiny moment to settle
-      setTimeout(() => {
-        recomputeProgression();
-      }, 200);
-    }
-  }, 1000);
+  let n=3;
+  countdownText.textContent=n;
+  const iv=setInterval(()=>{
+    n--; countdownText.textContent=n;
+    if(n===0){clearInterval(iv);successOverlay.classList.add("hidden");recomputeProgression();}
+  },1000);
 }
 
 /* LOG */
-logBtn.onclick = () => {
-  if (!eventOpen) return;
-  const c = competitors[index];
-  if (!c) return;
+logBtn.onclick=()=>{
+  const c=competitors[index];
+  if(!c||!eventOpen) return;
 
-  lastLog = {
-    logger: logger,
-    token: token,
-    event: eventSelect.value,
-    round: roundSelect.value,
-    competitorId: c.number,
-    competitorName: c.name,
-    isRerun: rerunChk.checked,
-    rerunReason: rerunReason.value,
-    notes: "",
-    action: "LOG"
+  lastLog={
+    logger, token,
+    event:eventSelect.value,
+    round:roundSelect.value,
+    competitorId:c.number,
+    competitorName:c.name,
+    isRerun:rerunChk.checked,
+    rerunReason:rerunReason.value,
+    notes:"",
+    action:"LOG"
   };
 
-  // Immediate UI feedback
   startCountdown();
 
-  // Fire-and-forget POST (Apps Script compatible)
-  try {
-    fetch(API_URL, {
-      method: "POST",
-      contentType: "application/json",
-      body: JSON.stringify(lastLog)
-    });
-  } catch (e) {
-    console.error(e);
-    statusText.textContent = "Logging failed";
-  }
+  fetch(API_URL,{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify(lastLog)
+  }).catch(()=>statusText.textContent="Logging error — check connection");
 };
-  
-  // 1️⃣ Start UI feedback immediately
-  startCountdown();
 
-  // 2️⃣ Fire write in background (do NOT await)
-  fetch(API_URL, {
-  method: "POST",
-  headers: {
-    "Content-Type": "application/json"
-  },
-  body: JSON.stringify(lastLog)
-}).catch(err => {
-  statusText.textContent = "Logging error — check connection";
-  console.error(err);
-});
-  
 /* UNDO */
-undoBtn.onclick=async()=>{
+undoBtn.onclick=()=>{
   if(!lastLog) return;
-  await fetch(API_URL,{method:"POST",body:JSON.stringify({...lastLog,action:"UNDO"})});
-  statusText.textContent="Last entry undone";
-  recomputeProgression();
+  fetch(API_URL,{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({...lastLog,action:"UNDO"})
+  }).then(()=>{statusText.textContent="Last entry undone";recomputeProgression();});
 };
 
 /* BOOT */
 (async()=>{
   await loadEventConfig();
-  await loadEvents();
-  await loadRounds();
-  await loadRerunReasons();
+  await loadSimpleList(EVENTS_GID,eventSelect);
+  await loadSimpleList(ROUNDS_GID,roundSelect);
+  await loadSimpleList(RERUN_GID,rerunReason);
   await loadCompetitors();
   await recomputeProgression();
 })();
 </script>
-
 </body>
 </html>
