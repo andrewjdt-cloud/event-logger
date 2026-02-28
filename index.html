@@ -258,41 +258,57 @@ roundSelect.onchange=recomputeProgression;
 /* SUCCESS FLOW */
 function startCountdown(){
   successOverlay.classList.remove("hidden");
-  let n=3;
-  countdownText.textContent=n;
-  const iv=setInterval(()=>{
+  let n = 3;
+  countdownText.textContent = n;
+
+  const iv = setInterval(async () => {
     n--;
-    countdownText.textContent=n;
-    if(n===0){
+    countdownText.textContent = n;
+
+    if (n === 0) {
       clearInterval(iv);
       successOverlay.classList.add("hidden");
-      recomputeProgression();
+
+      // Give Sheets a tiny moment to settle
+      setTimeout(() => {
+        recomputeProgression();
+      }, 200);
     }
-  },1000);
+  }, 1000);
 }
 
 /* LOG */
-logBtn.onclick=async()=>{
-  if(!eventOpen) return;
-  const c=competitors[index];
-  if(!c) return;
+logBtn.onclick = async () => {
+  if (!eventOpen) return;
+  const c = competitors[index];
+  if (!c) return;
 
-  lastLog={
-    logger,token,
-    event:eventSelect.value,
-    round:roundSelect.value,
-    competitorId:c.number,
-    competitorName:c.name,
-    isRerun:rerunChk.checked,
-    rerunReason:rerunReason.value,
-    notes:"",
-    action:"LOG"
+  lastLog = {
+    logger,
+    token,
+    event: eventSelect.value,
+    round: roundSelect.value,
+    competitorId: c.number,
+    competitorName: c.name,
+    isRerun: rerunChk.checked,
+    rerunReason: rerunReason.value,
+    notes: "",
+    action: "LOG"
   };
 
-  await fetch(API_URL,{method:"POST",body:JSON.stringify(lastLog)});
+  // 1️⃣ Start UI feedback immediately
   startCountdown();
-};
 
+  // 2️⃣ Fire write in background (do NOT await)
+  fetch(API_URL, {
+    method: "POST",
+    body: JSON.stringify(lastLog)
+  }).catch(err => {
+    statusText.textContent = "Logging error — check connection";
+    console.error(err);
+  });
+};
+  
 /* UNDO */
 undoBtn.onclick=async()=>{
   if(!lastLog) return;
