@@ -168,12 +168,18 @@ async function loadCompetitors(){
 async function recomputeProgression(){
   completed={};
   const j=parseGViz(await (await fetch(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?gid=${TIMELOG_GID}&tqx=out:json`)).text());
+
   j.table.rows.forEach(r=>{
-    if(r.c[1]?.v==eventSelect.value && r.c[2]?.v==roundSelect.value){
-      completed[r.c[3]?.v]=r.c[9]?.v==="LOG";
-    }
+    if(String(r.c[1]?.v)!==String(eventSelect.value)) return;
+    if(String(r.c[2]?.v)!==String(roundSelect.value)) return;
+    const comp=r.c[3]?.v;
+    const act=r.c[9]?.v;
+    if(act==="LOG") completed[comp]=true;
+    if(act==="UNDO") completed[comp]=false;
   });
-  index=Math.max(0,competitors.findIndex(c=>!completed[c.number]));
+
+  const next=competitors.findIndex(c=>!completed[c.number]);
+  index=next>=0?next:competitors.length-1;
   showCompetitor();
 }
 
@@ -192,23 +198,30 @@ rerunChk.onchange=()=>rerunReason.disabled=!rerunChk.checked;
 eventSelect.onchange=recomputeProgression;
 roundSelect.onchange=recomputeProgression;
 
-/* COUNTDOWN */
+/* SUCCESS */
 function startCountdown(){
   successOverlay.classList.remove("hidden");
   let n=3;
   countdownText.textContent=n;
   const iv=setInterval(()=>{
     n--; countdownText.textContent=n;
-    if(n===0){clearInterval(iv);successOverlay.classList.add("hidden");recomputeProgression();}
+    if(n===0){
+      clearInterval(iv);
+      successOverlay.classList.add("hidden");
+      recomputeProgression();
+    }
   },1000);
 }
 
 /* LOG */
-logBtn.onclick=()=>{
+logBtn.onclick=async()=>{
+  if(!eventOpen) return;
   const c=competitors[index];
-  if(!c||!eventOpen) return;
+  if(!c) return;
 
-  lastLog={
+  statusText.textContent="";
+
+  const payload={
     logger, token,
     event:eventSelect.value,
     round:roundSelect.value,
@@ -220,25 +233,38 @@ logBtn.onclick=()=>{
     action:"LOG"
   };
 
-  startCountdown();
+  try{
+    const res=await fetch(API_URL,{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify(payload)
+    });
+    const json=await res.json();
+    if(!json.ok) throw new Error(json.error||"Rejected");
 
-  fetch(API_URL,{
-    method:"POST",
-    mode: "cors",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify(lastLog)
-  }).catch(()=>statusText.textContent="Logging error — check connection");
+    lastLog=payload;
+    startCountdown();
+
+  }catch(e){
+    console.error(e);
+    statusText.textContent="Logging error — check connection";
+  }
 };
 
 /* UNDO */
-undoBtn.onclick=()=>{
+undoBtn.onclick=async()=>{
   if(!lastLog) return;
-  fetch(API_URL,{
-    method:"POST",
-    mode: "cors",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({...lastLog,action:"UNDO"})
-  }).then(()=>{statusText.textContent="Last entry undone";recomputeProgression();});
+  try{
+    await fetch(API_URL,{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({...lastLog,action:"UNDO"})
+    });
+    statusText.textContent="Last entry undone";
+    recomputeProgression();
+  }catch(e){
+    statusText.textContent="Undo failed";
+  }
 };
 
 /* BOOT */
@@ -251,5 +277,6 @@ undoBtn.onclick=()=>{
   await recomputeProgression();
 })();
 </script>
+
 </body>
 </html>
