@@ -122,100 +122,103 @@ const logger = params.get("logger");
 const token  = params.get("token");
 
 /* STATE */
-let competitors = [];
-let index = 0;
-let completed = {};
-let lastLog = null;
-let eventOpen = true;
+let competitors=[], index=0, completed={}, lastLog=null, eventOpen=true;
 
 /* ================= HELPERS ================= */
 function parseGViz(t){
   return JSON.parse(t.substring(t.indexOf("{"), t.lastIndexOf("}") + 1));
 }
 
+/* 🔒 ANDROID-SAFE FORM ENCODER */
+function toFormBody(obj){
+  return Object.keys(obj)
+    .map(k => encodeURIComponent(k) + "=" + encodeURIComponent(obj[k] ?? ""))
+    .join("&");
+}
+
 /* ================= LOADERS ================= */
 async function loadEventConfig(){
-  const res = await fetch(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?gid=${EVENTCONFIG_GID}&tqx=out:json`);
-  const j = parseGViz(await res.text());
+  const j=parseGViz(await (await fetch(
+    `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?gid=${EVENTCONFIG_GID}&tqx=out:json`
+  )).text());
 
   j.table.rows.slice(1).forEach(r=>{
-    const k = r.c[0]?.v;
-    const v = r.c[1]?.v;
-
-    if(k==="EventName") eventName.textContent = v || "";
-    if(k==="Location") eventLocation.textContent = v || "";
+    const k=r.c[0]?.v, v=r.c[1]?.v;
+    if(k==="EventName") eventName.textContent=v||"";
+    if(k==="Location") eventLocation.textContent=v||"";
     if(k==="ActiveEvent" && String(v).toUpperCase()!=="YES"){
-      eventOpen = false;
-      closedNotice.style.display = "block";
+      eventOpen=false;
+      closedNotice.style.display="block";
     }
   });
 }
 
 async function loadSimpleList(gid, select){
-  const res = await fetch(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?gid=${gid}&tqx=out:json`);
-  const j = parseGViz(await res.text());
+  const j=parseGViz(await (await fetch(
+    `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?gid=${gid}&tqx=out:json`
+  )).text());
 
-  select.innerHTML = "";
+  select.innerHTML="";
   j.table.rows.slice(1).forEach(r=>{
     if(r.c[0]?.v){
-      const o = document.createElement("option");
-      o.textContent = r.c[0].v;
+      const o=document.createElement("option");
+      o.textContent=r.c[0].v;
       select.appendChild(o);
     }
   });
 }
 
 async function loadCompetitors(){
-  const res = await fetch(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?gid=${COMPETITORS_GID}&tqx=out:json`);
-  const j = parseGViz(await res.text());
+  const j=parseGViz(await (await fetch(
+    `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?gid=${COMPETITORS_GID}&tqx=out:json`
+  )).text());
 
-  const h = j.table.cols.map(c=>c.label);
-  competitors = j.table.rows.map(r=>({
-    order: r.c[h.indexOf("CompetitorOrder")]?.v,
-    number: r.c[h.indexOf("CompetitorNumber")]?.v,
-    name: r.c[h.indexOf("CompetitorName")]?.v
+  const h=j.table.cols.map(c=>c.label);
+  competitors=j.table.rows.map(r=>({
+    order:r.c[h.indexOf("CompetitorOrder")]?.v,
+    number:r.c[h.indexOf("CompetitorNumber")]?.v,
+    name:r.c[h.indexOf("CompetitorName")]?.v
   })).sort((a,b)=>a.order-b.order);
 }
 
 /* ================= PROGRESSION ================= */
 async function recomputeProgression(){
-  completed = {};
-  const res = await fetch(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?gid=${TIMELOG_GID}&tqx=out:json`);
-  const j = parseGViz(await res.text());
+  completed={};
+  const j=parseGViz(await (await fetch(
+    `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?gid=${TIMELOG_GID}&tqx=out:json`
+  )).text());
 
   j.table.rows.forEach(r=>{
     if(r.c[1]?.v==eventSelect.value && r.c[2]?.v==roundSelect.value){
-      completed[r.c[3]?.v] = r.c[9]?.v==="LOG";
+      completed[r.c[3]?.v]=r.c[9]?.v==="LOG";
     }
   });
 
-  const next = competitors.findIndex(c=>!completed[c.number]);
-  index = next >= 0 ? next : competitors.length - 1;
+  const next=competitors.findIndex(c=>!completed[c.number]);
+  index=next>=0?next:competitors.length-1;
   showCompetitor();
 }
 
 /* ================= UI ================= */
 function showCompetitor(){
-  const c = competitors[index];
-  compNumber.textContent = c ? c.number : "—";
-  compName.textContent   = c ? c.name   : "—";
+  const c=competitors[index];
+  compNumber.textContent=c?c.number:"—";
+  compName.textContent=c?c.name:"—";
 }
 
-prevBtn.onclick = ()=>{ if(index>0){ index--; showCompetitor(); }};
-nextBtn.onclick = ()=>{ if(index<competitors.length-1){ index++; showCompetitor(); }};
-rerunChk.onchange = ()=> rerunReason.disabled = !rerunChk.checked;
-eventSelect.onchange = recomputeProgression;
-roundSelect.onchange = recomputeProgression;
+prevBtn.onclick=()=>{if(index>0){index--;showCompetitor();}};
+nextBtn.onclick=()=>{if(index<competitors.length-1){index++;showCompetitor();}};
+rerunChk.onchange=()=>rerunReason.disabled=!rerunChk.checked;
+eventSelect.onchange=recomputeProgression;
+roundSelect.onchange=recomputeProgression;
 
 /* ================= FEEDBACK ================= */
 function startCountdown(){
   successOverlay.classList.remove("hidden");
-  let n = 3;
-  countdownText.textContent = n;
-
-  const iv = setInterval(()=>{
-    n--;
-    countdownText.textContent = n;
+  let n=3;
+  countdownText.textContent=n;
+  const iv=setInterval(()=>{
+    n--; countdownText.textContent=n;
     if(n===0){
       clearInterval(iv);
       successOverlay.classList.add("hidden");
@@ -225,70 +228,53 @@ function startCountdown(){
 }
 
 /* ================= LOG ================= */
-logBtn.onclick = () => {
-  if (!eventOpen) return;
-  const c = competitors[index];
-  if (!c) return;
+logBtn.onclick=()=>{
+  if(!eventOpen) return;
+  const c=competitors[index];
+  if(!c) return;
 
-  lastLog = {
-    logger,
-    token,
-    event: eventSelect.value,
-    round: roundSelect.value,
-    competitorId: c.number,
-    competitorName: c.name,
-    isRerun: rerunChk.checked ? "YES" : "NO",
-    rerunReason: rerunChk.checked ? rerunReason.value : "",
-    notes: "",
-    action: "LOG"
+  lastLog={
+    logger, token,
+    event:eventSelect.value,
+    round:roundSelect.value,
+    competitorId:c.number,
+    competitorName:c.name,
+    isRerun:rerunChk.checked?"YES":"NO",
+    rerunReason:rerunChk.checked?rerunReason.value:"",
+    notes:"",
+    action:"LOG"
   };
 
-  // UI feedback immediately
   startCountdown();
-  statusText.textContent = "Logged";
+  statusText.textContent="Logged";
 
-  // Build form body (ANDROID SAFE)
-  const body = new URLSearchParams(lastLog).toString();
-
-  // Fire-and-forget POST
-  fetch(API_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded"
-    },
-    body
+  fetch(API_URL,{
+    method:"POST",
+    headers:{"Content-Type":"application/x-www-form-urlencoded"},
+    body:toFormBody(lastLog)
   });
-};
-  statusText.textContent = "Logged";
 };
 
 /* ================= UNDO ================= */
-undoBtn.onclick = () => {
-  if (!lastLog) return;
+undoBtn.onclick=()=>{
+  if(!lastLog) return;
 
-  const body = new URLSearchParams({
-    ...lastLog,
-    action: "UNDO"
-  }).toString();
-
-  fetch(API_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded"
-    },
-    body
+  fetch(API_URL,{
+    method:"POST",
+    headers:{"Content-Type":"application/x-www-form-urlencoded"},
+    body:toFormBody({...lastLog,action:"UNDO"})
   });
 
-  statusText.textContent = "Last entry undone";
+  statusText.textContent="Last entry undone";
   recomputeProgression();
 };
-  
+
 /* ================= BOOT ================= */
 (async()=>{
   await loadEventConfig();
-  await loadSimpleList(EVENTS_GID, eventSelect);
-  await loadSimpleList(ROUNDS_GID, roundSelect);
-  await loadSimpleList(RERUN_GID, rerunReason);
+  await loadSimpleList(EVENTS_GID,eventSelect);
+  await loadSimpleList(ROUNDS_GID,roundSelect);
+  await loadSimpleList(RERUN_GID,rerunReason);
   await loadCompetitors();
   await recomputeProgression();
 })();
