@@ -207,8 +207,8 @@ logBtn.onclick=()=>{
     round:roundSelect.value,
     competitorId:c.number,
     competitorName:c.name,
-    isRerun:rerunChk.checked,
-    rerunReason:rerunReason.value,
+    isRerun: rerunChk.checked,
+    rerunReason: rerunChk.checked ? rerunReason.value : "",
     notes:"",
     action:"LOG"
   };
