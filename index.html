@@ -105,8 +105,9 @@ button.log{
 </div>
 
 <script>
+/* ================= CONFIG ================= */
 const SHEET_ID="1EsFTZZkAbdVCYu8wT_gR2V_l_knRAGSmD0F5X0PA3rE";
-const API_URL="https://script.google.com/macros/s/AKfycbx80RITVW2X6aZI9Zg1pXMWObyArLPuz7AamQhd_4lAQoy7bhPu6SkvQwhUb39tq88GsA/exec";
+const API_URL="https://script.google.com/macros/s/AKfycbyCAYRIjhXoDRqYKeoTKNpQlGUzDk6Jv6BHZxAxL1e40Ufw1tzuGqoDHZST1-Vo9yxgvQ/exec";
 
 const EVENTCONFIG_GID=0;
 const EVENTS_GID=1157267667;
@@ -115,79 +116,106 @@ const COMPETITORS_GID=1455640270;
 const TIMELOG_GID=1894563340;
 const RERUN_GID=110041342;
 
-const params=new URLSearchParams(location.search);
-const logger=params.get("logger");
-const token=params.get("token");
+/* AUTH */
+const params = new URLSearchParams(location.search);
+const logger = params.get("logger");
+const token  = params.get("token");
 
-let competitors=[], index=0, completed={}, lastLog=null, eventOpen=true;
+/* STATE */
+let competitors = [];
+let index = 0;
+let completed = {};
+let lastLog = null;
+let eventOpen = true;
 
+/* ================= HELPERS ================= */
 function parseGViz(t){
-  return JSON.parse(t.substring(t.indexOf("{"),t.lastIndexOf("}")+1));
+  return JSON.parse(t.substring(t.indexOf("{"), t.lastIndexOf("}") + 1));
 }
 
+/* ================= LOADERS ================= */
 async function loadEventConfig(){
-  const j=parseGViz(await (await fetch(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?gid=${EVENTCONFIG_GID}&tqx=out:json`)).text());
+  const res = await fetch(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?gid=${EVENTCONFIG_GID}&tqx=out:json`);
+  const j = parseGViz(await res.text());
+
   j.table.rows.slice(1).forEach(r=>{
-    const k=r.c[0]?.v, v=r.c[1]?.v;
-    if(k==="EventName") eventName.textContent=v;
-    if(k==="Location") eventLocation.textContent=v;
+    const k = r.c[0]?.v;
+    const v = r.c[1]?.v;
+
+    if(k==="EventName") eventName.textContent = v || "";
+    if(k==="Location") eventLocation.textContent = v || "";
     if(k==="ActiveEvent" && String(v).toUpperCase()!=="YES"){
-      eventOpen=false;
-      closedNotice.style.display="block";
+      eventOpen = false;
+      closedNotice.style.display = "block";
     }
   });
 }
 
 async function loadSimpleList(gid, select){
-  const j=parseGViz(await (await fetch(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?gid=${gid}&tqx=out:json`)).text());
-  select.innerHTML="";
+  const res = await fetch(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?gid=${gid}&tqx=out:json`);
+  const j = parseGViz(await res.text());
+
+  select.innerHTML = "";
   j.table.rows.slice(1).forEach(r=>{
     if(r.c[0]?.v){
-      const o=document.createElement("option");
-      o.textContent=r.c[0].v;
+      const o = document.createElement("option");
+      o.textContent = r.c[0].v;
       select.appendChild(o);
     }
   });
 }
 
 async function loadCompetitors(){
-  const j=parseGViz(await (await fetch(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?gid=${COMPETITORS_GID}&tqx=out:json`)).text());
-  const h=j.table.cols.map(c=>c.label);
-  competitors=j.table.rows.map(r=>({
-    order:r.c[h.indexOf("CompetitorOrder")]?.v,
-    number:r.c[h.indexOf("CompetitorNumber")]?.v,
-    name:r.c[h.indexOf("CompetitorName")]?.v
+  const res = await fetch(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?gid=${COMPETITORS_GID}&tqx=out:json`);
+  const j = parseGViz(await res.text());
+
+  const h = j.table.cols.map(c=>c.label);
+  competitors = j.table.rows.map(r=>({
+    order: r.c[h.indexOf("CompetitorOrder")]?.v,
+    number: r.c[h.indexOf("CompetitorNumber")]?.v,
+    name: r.c[h.indexOf("CompetitorName")]?.v
   })).sort((a,b)=>a.order-b.order);
 }
 
+/* ================= PROGRESSION ================= */
 async function recomputeProgression(){
-  completed={};
-  const j=parseGViz(await (await fetch(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?gid=${TIMELOG_GID}&tqx=out:json`)).text());
+  completed = {};
+  const res = await fetch(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?gid=${TIMELOG_GID}&tqx=out:json`);
+  const j = parseGViz(await res.text());
+
   j.table.rows.forEach(r=>{
     if(r.c[1]?.v==eventSelect.value && r.c[2]?.v==roundSelect.value){
-      if(r.c[9]?.v==="LOG") completed[r.c[3]?.v]=true;
-      if(r.c[9]?.v==="UNDO") completed[r.c[3]?.v]=false;
+      completed[r.c[3]?.v] = r.c[9]?.v==="LOG";
     }
   });
-  index=Math.max(0,competitors.findIndex(c=>!completed[c.number]));
+
+  const next = competitors.findIndex(c=>!completed[c.number]);
+  index = next >= 0 ? next : competitors.length - 1;
   showCompetitor();
 }
 
+/* ================= UI ================= */
 function showCompetitor(){
-  const c=competitors[index];
-  if(c){
-    compNumber.textContent=c.number;
-    compName.textContent=c.name;
-  }
+  const c = competitors[index];
+  compNumber.textContent = c ? c.number : "—";
+  compName.textContent   = c ? c.name   : "—";
 }
 
+prevBtn.onclick = ()=>{ if(index>0){ index--; showCompetitor(); }};
+nextBtn.onclick = ()=>{ if(index<competitors.length-1){ index++; showCompetitor(); }};
+rerunChk.onchange = ()=> rerunReason.disabled = !rerunChk.checked;
+eventSelect.onchange = recomputeProgression;
+roundSelect.onchange = recomputeProgression;
+
+/* ================= FEEDBACK ================= */
 function startCountdown(){
   successOverlay.classList.remove("hidden");
-  let n=3;
-  countdownText.textContent=n;
-  const iv=setInterval(()=>{
+  let n = 3;
+  countdownText.textContent = n;
+
+  const iv = setInterval(()=>{
     n--;
-    countdownText.textContent=n;
+    countdownText.textContent = n;
     if(n===0){
       clearInterval(iv);
       successOverlay.classList.add("hidden");
@@ -196,27 +224,12 @@ function startCountdown(){
   },1000);
 }
 
-<script>
-logBtn.onclick = () => {
-  if (!eventOpen) return;
-
+/* ================= LOG ================= */
+logBtn.onclick = ()=>{
+  if(!eventOpen) return;
   const c = competitors[index];
-  if (!c) return;
+  if(!c) return;
 
-  // Build FormData (Android-safe, no CORS preflight)
-  const fd = new FormData();
-  fd.append("logger", logger);
-  fd.append("token", token);
-  fd.append("event", eventSelect.value);
-  fd.append("round", roundSelect.value);
-  fd.append("competitorId", c.number);
-  fd.append("competitorName", c.name);
-  fd.append("isRerun", rerunChk.checked ? "YES" : "NO");
-  fd.append("rerunReason", rerunChk.checked ? rerunReason.value : "");
-  fd.append("notes", "");
-  fd.append("action", "LOG");
-
-  // Keep last log for undo
   lastLog = {
     logger,
     token,
@@ -230,55 +243,37 @@ logBtn.onclick = () => {
     action: "LOG"
   };
 
-  // Immediate UI feedback
   startCountdown();
-  statusText.textContent = "Logged";
 
-  // Fire-and-forget POST (works on Windows + Android)
-  fetch(API_URL, {
-    method: "POST",
-    mode: "no-cors",
-    body: fd
+  fetch(API_URL,{
+    method:"POST",
+    mode:"no-cors",
+    body: JSON.stringify(lastLog)
   });
+
+  statusText.textContent = "Logged";
 };
-</script>  
 
-<script>
-undoBtn.onclick = () => {
-  if (!lastLog) return;
+/* ================= UNDO ================= */
+undoBtn.onclick = ()=>{
+  if(!lastLog) return;
 
-  const fd = new FormData();
-  fd.append("logger", lastLog.logger);
-  fd.append("token", lastLog.token);
-  fd.append("event", lastLog.event);
-  fd.append("round", lastLog.round);
-  fd.append("competitorId", lastLog.competitorId);
-  fd.append("competitorName", lastLog.competitorName);
-  fd.append("isRerun", lastLog.isRerun ? "YES" : "NO");
-  fd.append("rerunReason", lastLog.rerunReason || "");
-  fd.append("notes", "");
-  fd.append("action", "UNDO");
-
-  fetch(API_URL, {
-    method: "POST",
-    mode: "no-cors",
-    body: fd
+  fetch(API_URL,{
+    method:"POST",
+    mode:"no-cors",
+    body: JSON.stringify({...lastLog, action:"UNDO"})
   });
 
   statusText.textContent = "Last entry undone";
   recomputeProgression();
 };
-</script>
 
-rerunChk.onchange=()=>rerunReason.disabled=!rerunChk.checked;
-eventSelect.onchange=recomputeProgression;
-roundSelect.onchange=recomputeProgression;
-
+/* ================= BOOT ================= */
 (async()=>{
   await loadEventConfig();
-  await loadSimpleList(EVENTS_GID,eventSelect);
-  await loadSimpleList(ROUNDS_GID,roundSelect);
-  await loadSimpleList(RERUN_GID,rerunReason);
+  await loadSimpleList(EVENTS_GID, eventSelect);
+  await loadSimpleList(ROUNDS_GID, roundSelect);
+  await loadSimpleList(RERUN_GID, rerunReason);
   await loadCompetitors();
   await recomputeProgression();
 })();
