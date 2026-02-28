@@ -224,6 +224,7 @@ logBtn.onclick=()=>{
 
   fetch(API_URL,{
     method:"POST",
+    mode: "cors",
     headers:{"Content-Type":"application/json"},
     body:JSON.stringify(lastLog)
   }).catch(()=>statusText.textContent="Logging error — check connection");
@@ -234,6 +235,7 @@ undoBtn.onclick=()=>{
   if(!lastLog) return;
   fetch(API_URL,{
     method:"POST",
+    mode: "cors",
     headers:{"Content-Type":"application/json"},
     body:JSON.stringify({...lastLog,action:"UNDO"})
   }).then(()=>{statusText.textContent="Last entry undone";recomputeProgression();});
