@@ -196,29 +196,28 @@ function startCountdown(){
   },1000);
 }
 
-logBtn.onclick=()=>{
-  if(!eventOpen) return;
-  const c=competitors[index];
-  if(!c) return;
+<script>
+logBtn.onclick = () => {
+  if (!eventOpen) return;
 
-  lastLog={
-    logger, token,
-    event:eventSelect.value,
-    round:roundSelect.value,
-    competitorId:c.number,
-    competitorName:c.name,
-    isRerun: rerunChk.checked,
-    rerunReason: rerunChk.checked ? rerunReason.value : "",
-    notes:"",
-    action:"LOG"
-  };
+  const c = competitors[index];
+  if (!c) return;
 
-  startCountdown();
+  // Build FormData (Android-safe, no CORS preflight)
+  const fd = new FormData();
+  fd.append("logger", logger);
+  fd.append("token", token);
+  fd.append("event", eventSelect.value);
+  fd.append("round", roundSelect.value);
+  fd.append("competitorId", c.number);
+  fd.append("competitorName", c.name);
+  fd.append("isRerun", rerunChk.checked ? "YES" : "NO");
+  fd.append("rerunReason", rerunChk.checked ? rerunReason.value : "");
+  fd.append("notes", "");
+  fd.append("action", "LOG");
 
-  fetch(API_URL, {
-  method: "POST",
-  mode: "no-cors",
-  body: JSON.stringify({
+  // Keep last log for undo
+  lastLog = {
     logger,
     token,
     event: eventSelect.value,
@@ -229,25 +228,47 @@ logBtn.onclick=()=>{
     rerunReason: rerunChk.checked ? rerunReason.value : "",
     notes: "",
     action: "LOG"
-  })
-});
-  
-  statusText.textContent="Logged";
-};
+  };
 
-undoBtn.onclick=()=>{
-  if(!lastLog) return;
+  // Immediate UI feedback
+  startCountdown();
+  statusText.textContent = "Logged";
+
+  // Fire-and-forget POST (works on Windows + Android)
   fetch(API_URL, {
-  method: "POST",
-  mode: "no-cors",
-  body: JSON.stringify({
-    ...lastLog,
-    action: "UNDO"
-  })
-});
-  statusText.textContent="Last entry undone";
+    method: "POST",
+    mode: "no-cors",
+    body: fd
+  });
+};
+</script>  
+
+<script>
+undoBtn.onclick = () => {
+  if (!lastLog) return;
+
+  const fd = new FormData();
+  fd.append("logger", lastLog.logger);
+  fd.append("token", lastLog.token);
+  fd.append("event", lastLog.event);
+  fd.append("round", lastLog.round);
+  fd.append("competitorId", lastLog.competitorId);
+  fd.append("competitorName", lastLog.competitorName);
+  fd.append("isRerun", lastLog.isRerun ? "YES" : "NO");
+  fd.append("rerunReason", lastLog.rerunReason || "");
+  fd.append("notes", "");
+  fd.append("action", "UNDO");
+
+  fetch(API_URL, {
+    method: "POST",
+    mode: "no-cors",
+    body: fd
+  });
+
+  statusText.textContent = "Last entry undone";
   recomputeProgression();
 };
+</script>
 
 rerunChk.onchange=()=>rerunReason.disabled=!rerunChk.checked;
 eventSelect.onchange=recomputeProgression;
