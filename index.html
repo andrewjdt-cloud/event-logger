@@ -216,10 +216,21 @@ logBtn.onclick=()=>{
   startCountdown();
 
   fetch(API_URL, {
-    method: "POST",
-    mode: "no-cors",
-    body: JSON.stringify(lastLog)
-  });
+  method: "POST",
+  mode: "no-cors",
+  body: JSON.stringify({
+    logger,
+    token,
+    event: eventSelect.value,
+    round: roundSelect.value,
+    competitorId: c.number,
+    competitorName: c.name,
+    isRerun: rerunChk.checked,
+    rerunReason: rerunChk.checked ? rerunReason.value : "",
+    notes: "",
+    action: "LOG"
+  })
+});
   
   statusText.textContent="Logged";
 };
@@ -227,10 +238,13 @@ logBtn.onclick=()=>{
 undoBtn.onclick=()=>{
   if(!lastLog) return;
   fetch(API_URL, {
-    method: "POST",
-    mode: "no-cors",
-    body: JSON.stringify({ ...lastLog, action: "UNDO" })
-  });
+  method: "POST",
+  mode: "no-cors",
+  body: JSON.stringify({
+    ...lastLog,
+    action: "UNDO"
+  })
+});
   statusText.textContent="Last entry undone";
   recomputeProgression();
 };
