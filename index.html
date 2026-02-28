@@ -225,10 +225,10 @@ function startCountdown(){
 }
 
 /* ================= LOG ================= */
-logBtn.onclick = ()=>{
-  if(!eventOpen) return;
+logBtn.onclick = () => {
+  if (!eventOpen) return;
   const c = competitors[index];
-  if(!c) return;
+  if (!c) return;
 
   lastLog = {
     logger,
@@ -237,37 +237,52 @@ logBtn.onclick = ()=>{
     round: roundSelect.value,
     competitorId: c.number,
     competitorName: c.name,
-    isRerun: rerunChk.checked,
+    isRerun: rerunChk.checked ? "YES" : "NO",
     rerunReason: rerunChk.checked ? rerunReason.value : "",
     notes: "",
     action: "LOG"
   };
 
+  // UI feedback immediately
   startCountdown();
+  statusText.textContent = "Logged";
 
-  fetch(API_URL,{
-    method:"POST",
-    mode:"no-cors",
-    body: JSON.stringify(lastLog)
+  // Build form body (ANDROID SAFE)
+  const body = new URLSearchParams(lastLog).toString();
+
+  // Fire-and-forget POST
+  fetch(API_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded"
+    },
+    body
   });
-
+};
   statusText.textContent = "Logged";
 };
 
 /* ================= UNDO ================= */
-undoBtn.onclick = ()=>{
-  if(!lastLog) return;
+undoBtn.onclick = () => {
+  if (!lastLog) return;
 
-  fetch(API_URL,{
-    method:"POST",
-    mode:"no-cors",
-    body: JSON.stringify({...lastLog, action:"UNDO"})
+  const body = new URLSearchParams({
+    ...lastLog,
+    action: "UNDO"
+  }).toString();
+
+  fetch(API_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded"
+    },
+    body
   });
 
   statusText.textContent = "Last entry undone";
   recomputeProgression();
 };
-
+  
 /* ================= BOOT ================= */
 (async()=>{
   await loadEventConfig();
