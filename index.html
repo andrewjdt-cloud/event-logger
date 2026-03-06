@@ -230,58 +230,51 @@ function startCountdown(){
 /* ================= LOG ================= */
 logBtn.onclick = () => {
   if (!eventOpen) return;
+
   const c = competitors[index];
   if (!c) return;
 
-  lastLog = {
-    logger,
-    token,
-    event: eventSelect.value,
-    round: roundSelect.value,
-    competitorId: c.number,
-    competitorName: c.name,
-    isRerun: rerunChk.checked ? "YES" : "NO",
-    rerunReason: rerunChk.checked ? rerunReason.value : "",
-    notes: "",
-    action: "LOG"
-  };
+  const form = document.getElementById("logForm");
 
-  // Immediate UI feedback
+  form.logger.value = logger;
+  form.token.value = token;
+  form.event.value = eventSelect.value;
+  form.round.value = roundSelect.value;
+  form.competitorId.value = c.number;
+  form.competitorName.value = c.name;
+  form.isRerun.value = rerunChk.checked ? "YES" : "NO";
+  form.rerunReason.value = rerunChk.checked ? rerunReason.value : "";
+  form.notes.value = "";
+  form.action.value = "LOG";
+
   startCountdown();
   statusText.textContent = "Logged";
 
-  // Fire-and-forget POST (works on Android + Windows)
-  fetch(API_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded"
-    },
-    body: new URLSearchParams(lastLog).toString()
-  }).catch(err => {
-    console.error(err);
-  });
-};  
+  form.submit();
+};
   
 /* ================= UNDO ================= */
 undoBtn.onclick = () => {
+
   if (!lastLog) return;
 
-  const payload = {
-    ...lastLog,
-    action: "UNDO"
-  };
+  const form = document.getElementById("logForm");
 
-  fetch(API_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded"
-    },
-    body: new URLSearchParams(payload).toString()
-  }).catch(err => {
-    console.error(err);
-  });
+  form.logger.value = lastLog.logger;
+  form.token.value = lastLog.token;
+  form.event.value = lastLog.event;
+  form.round.value = lastLog.round;
+  form.competitorId.value = lastLog.competitorId;
+  form.competitorName.value = lastLog.competitorName;
+  form.isRerun.value = lastLog.isRerun;
+  form.rerunReason.value = lastLog.rerunReason;
+  form.notes.value = "";
+  form.action.value = "UNDO";
 
   statusText.textContent = "Last entry undone";
+
+  form.submit();
+
   recomputeProgression();
 };
   
@@ -295,5 +288,21 @@ undoBtn.onclick = () => {
   await recomputeProgression();
 })();
 </script>
+
+<form id="logForm" method="POST" target="hiddenFrame" action="https://script.google.com/macros/s/AKfycbydjHlNXRgP-o4Lyp5nURLAcgVNttWHoyt19P_TK6FiZqhXDWgnD00YivpwN5leIOO7mQ/exec">
+  <input type="hidden" name="logger">
+  <input type="hidden" name="token">
+  <input type="hidden" name="event">
+  <input type="hidden" name="round">
+  <input type="hidden" name="competitorId">
+  <input type="hidden" name="competitorName">
+  <input type="hidden" name="isRerun">
+  <input type="hidden" name="rerunReason">
+  <input type="hidden" name="notes">
+  <input type="hidden" name="action">
+</form>
+
+<iframe name="hiddenFrame" style="display:none;"></iframe>
+
 </body>
 </html>
