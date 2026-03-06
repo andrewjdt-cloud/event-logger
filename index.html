@@ -228,47 +228,56 @@ function startCountdown(){
 }
 
 /* ================= LOG ================= */
-logBtn.onclick=()=>{
-  if(!eventOpen) return;
-  const c=competitors[index];
-  if(!c) return;
+logBtn.onclick = () => {
+  if (!eventOpen) return;
+  const c = competitors[index];
+  if (!c) return;
 
-  lastLog={
-    logger, token,
-    event:eventSelect.value,
-    round:roundSelect.value,
-    competitorId:c.number,
-    competitorName:c.name,
-    isRerun:rerunChk.checked?"YES":"NO",
-    rerunReason:rerunChk.checked?rerunReason.value:"",
-    notes:"",
-    action:"LOG"
+  lastLog = {
+    logger,
+    token,
+    event: eventSelect.value,
+    round: roundSelect.value,
+    competitorId: c.number,
+    competitorName: c.name,
+    isRerun: rerunChk.checked ? "YES" : "NO",
+    rerunReason: rerunChk.checked ? rerunReason.value : "",
+    notes: "",
+    action: "LOG"
   };
 
+  // Immediate UI feedback
   startCountdown();
-  statusText.textContent="Logged";
+  statusText.textContent = "Logged";
 
-  fetch(API_URL,{
-    method:"POST",
-    headers:{"Content-Type":"application/x-www-form-urlencoded"},
-    body:toFormBody(lastLog)
+  // Android-safe, guaranteed delivery
+  const body = new URLSearchParams(lastLog).toString();
+  const blob = new Blob([body], {
+    type: "application/x-www-form-urlencoded"
   });
+
+  navigator.sendBeacon(API_URL, blob);
 };
-
+  
 /* ================= UNDO ================= */
-undoBtn.onclick=()=>{
-  if(!lastLog) return;
+undoBtn.onclick = () => {
+  if (!lastLog) return;
 
-  fetch(API_URL,{
-    method:"POST",
-    headers:{"Content-Type":"application/x-www-form-urlencoded"},
-    body:toFormBody({...lastLog,action:"UNDO"})
+  const body = new URLSearchParams({
+    ...lastLog,
+    action: "UNDO"
+  }).toString();
+
+  const blob = new Blob([body], {
+    type: "application/x-www-form-urlencoded"
   });
 
-  statusText.textContent="Last entry undone";
+  navigator.sendBeacon(API_URL, blob);
+
+  statusText.textContent = "Last entry undone";
   recomputeProgression();
 };
-
+  
 /* ================= BOOT ================= */
 (async()=>{
   await loadEventConfig();
