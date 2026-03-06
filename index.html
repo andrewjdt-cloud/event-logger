@@ -250,29 +250,36 @@ logBtn.onclick = () => {
   startCountdown();
   statusText.textContent = "Logged";
 
-  // Android-safe, guaranteed delivery
-  const body = new URLSearchParams(lastLog).toString();
-  const blob = new Blob([body], {
-    type: "application/x-www-form-urlencoded"
+  // Fire-and-forget POST (works on Android + Windows)
+  fetch(API_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded"
+    },
+    body: new URLSearchParams(lastLog).toString()
+  }).catch(err => {
+    console.error(err);
   });
-
-  navigator.sendBeacon(API_URL, blob);
-};
+};  
   
 /* ================= UNDO ================= */
 undoBtn.onclick = () => {
   if (!lastLog) return;
 
-  const body = new URLSearchParams({
+  const payload = {
     ...lastLog,
     action: "UNDO"
-  }).toString();
+  };
 
-  const blob = new Blob([body], {
-    type: "application/x-www-form-urlencoded"
+  fetch(API_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded"
+    },
+    body: new URLSearchParams(payload).toString()
+  }).catch(err => {
+    console.error(err);
   });
-
-  navigator.sendBeacon(API_URL, blob);
 
   statusText.textContent = "Last entry undone";
   recomputeProgression();
