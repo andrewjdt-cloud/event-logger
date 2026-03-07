@@ -253,12 +253,11 @@ logBtn.onclick = () => {
     action: "LOG"
   });
 
-  const url = API_URL + "?" + params.toString();
+  const url = API_URL + "&" + params.toString();
 
   startCountdown();
   statusText.textContent = "Logged";
 
-  // persist request so browser actually sends it
   window.loggerPing = new Image();
   window.loggerPing.src = url;
 
