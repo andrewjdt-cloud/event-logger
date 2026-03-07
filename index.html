@@ -258,14 +258,13 @@ logBtn.onclick = () => {
   startCountdown();
   statusText.textContent = "Logged";
 
-  // guaranteed request delivery
-  const img = new Image();
-  img.src = url;
+  // persist request so browser actually sends it
+  window.loggerPing = new Image();
+  window.loggerPing.src = url;
 
-  // progress after short delay
   setTimeout(() => {
     recomputeProgression();
-  }, 500);
+  }, 800);
 
 };
   
