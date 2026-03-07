@@ -228,7 +228,7 @@ function startCountdown(){
 }
 
 /* ================= LOG ================= */
-logBtn.onclick = async () => {
+logBtn.onclick = () => {
 
   if (!eventOpen) return;
 
@@ -248,24 +248,19 @@ logBtn.onclick = async () => {
     action: "LOG"
   });
 
+  const url = API_URL + "?" + params.toString();
+
   startCountdown();
   statusText.textContent = "Logged";
 
-  try {
-    await fetch(API_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded"
-      },
-      body: params.toString()
-    });
+  // guaranteed request delivery
+  const img = new Image();
+  img.src = url;
 
+  // progress after short delay
+  setTimeout(() => {
     recomputeProgression();
-
-  } catch (err) {
-    statusText.textContent = "Logging failed";
-    console.error(err);
-  }
+  }, 500);
 
 };
   
