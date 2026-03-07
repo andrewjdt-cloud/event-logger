@@ -229,41 +229,27 @@ function startCountdown(){
 
 /* ================= LOG ================= */
 logBtn.onclick = () => {
-  if (!eventOpen) return;
 
   const c = competitors[index];
   if (!c) return;
 
-  const form = document.getElementById("logForm");
-
-  lastLog = {
-    logger: logger,
-    token: token,
-    event: eventSelect.value,
-    round: roundSelect.value,
-    competitorId: c.number,
-    competitorName: c.name,
-    isRerun: rerunChk.checked ? "YES" : "NO",
-    rerunReason: rerunChk.checked ? rerunReason.value : "",
-    notes: "",
-    action: "LOG"
-  };
-
-  form.logger.value = lastLog.logger;
-  form.token.value = lastLog.token;
-  form.event.value = lastLog.event;
-  form.round.value = lastLog.round;
-  form.competitorId.value = lastLog.competitorId;
-  form.competitorName.value = lastLog.competitorName;
-  form.isRerun.value = lastLog.isRerun;
-  form.rerunReason.value = lastLog.rerunReason;
-  form.notes.value = lastLog.notes;
-  form.action.value = lastLog.action;
+  const url =
+    API_URL +
+    "?logger=" + encodeURIComponent(logger) +
+    "&token=" + encodeURIComponent(token) +
+    "&event=" + encodeURIComponent(eventSelect.value) +
+    "&round=" + encodeURIComponent(roundSelect.value) +
+    "&competitorId=" + encodeURIComponent(c.number) +
+    "&competitorName=" + encodeURIComponent(c.name) +
+    "&isRerun=" + encodeURIComponent(rerunChk.checked ? "YES" : "NO") +
+    "&rerunReason=" + encodeURIComponent(rerunChk.checked ? rerunReason.value : "") +
+    "&notes=" +
+    "&action=LOG";
 
   startCountdown();
   statusText.textContent = "Logged";
 
-  form.submit();
+  new Image().src = url;
 };
   
 /* ================= UNDO ================= */
@@ -271,26 +257,25 @@ undoBtn.onclick = () => {
 
   if (!lastLog) return;
 
-  const form = document.getElementById("logForm");
+  const url =
+    API_URL +
+    "?logger=" + encodeURIComponent(lastLog.logger) +
+    "&token=" + encodeURIComponent(lastLog.token) +
+    "&event=" + encodeURIComponent(lastLog.event) +
+    "&round=" + encodeURIComponent(lastLog.round) +
+    "&competitorId=" + encodeURIComponent(lastLog.competitorId) +
+    "&competitorName=" + encodeURIComponent(lastLog.competitorName) +
+    "&isRerun=" + encodeURIComponent(lastLog.isRerun) +
+    "&rerunReason=" + encodeURIComponent(lastLog.rerunReason) +
+    "&notes=" +
+    "&action=UNDO";
 
-  form.logger.value = lastLog.logger;
-  form.token.value = lastLog.token;
-  form.event.value = lastLog.event;
-  form.round.value = lastLog.round;
-  form.competitorId.value = lastLog.competitorId;
-  form.competitorName.value = lastLog.competitorName;
-  form.isRerun.value = lastLog.isRerun;
-  form.rerunReason.value = lastLog.rerunReason;
-  form.notes.value = "";
-  form.action.value = "UNDO";
+  new Image().src = url;
 
   statusText.textContent = "Last entry undone";
-
-  form.submit();
-
   recomputeProgression();
 };
-  
+
 /* ================= BOOT ================= */
 (async()=>{
   await loadEventConfig();
@@ -302,7 +287,7 @@ undoBtn.onclick = () => {
 })();
 </script>
 
-<form id="logForm" method="POST" target="hiddenFrame" action="https://script.google.com/macros/s/AKfycbwXRN8yNt9NbOntaN4sm2wKx6BU00TWPyRtk6VVjtUs9_h5tPj4iZVKeOL7z2o_AbpAqQ/exec">
+<form id="logForm" method="POST" target="hiddenFrame" action="https://script.google.com/macros/s/AKfycbxGgczEkyW170z-hNp4yoORftU1SKiSBV4_5h_RywcGhTBhIQFtYedyJlBPiYjnlDlicA/exec">
   <input type="hidden" name="logger">
   <input type="hidden" name="token">
   <input type="hidden" name="event">
