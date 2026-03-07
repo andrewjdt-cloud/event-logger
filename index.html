@@ -253,19 +253,20 @@ logBtn.onclick = () => {
     action: "LOG"
   });
 
-  const url = API_URL + "?" + params.toString();
-
   startCountdown();
   statusText.textContent = "Logged";
 
-  fetch(url, {
-    method: "GET",
-    mode: "no-cors"
-  });
+  navigator.sendBeacon(
+    API_URL,
+    new Blob([params.toString()], {
+      type: "application/x-www-form-urlencoded"
+    })
+  );
 
   setTimeout(() => {
     recomputeProgression();
   }, 800);
+
 };
   
 /* ================= UNDO ================= */
