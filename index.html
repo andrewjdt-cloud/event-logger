@@ -253,6 +253,13 @@ logBtn.onclick = () => {
     action: "LOG"
   });
 
+  lastLog = {
+  competitorId: c.number,
+  competitorName: c.name,
+  isRerun: rerunChk.checked ? "YES" : "NO",
+  rerunReason: rerunChk.checked ? rerunReason.value : ""
+  };
+  
   startCountdown();
   statusText.textContent = "Logged";
 
@@ -270,25 +277,35 @@ logBtn.onclick = () => {
 };
   
 /* ================= UNDO ================= */
-undoBtn.onclick = async () => {
+undoBtn.onclick = () => {
 
   if (!lastLog) return;
 
   const params = new URLSearchParams({
-    ...lastLog,
+    logger: logger,
+    token: token,
+    event: eventSelect.value,
+    round: roundSelect.value,
+    competitorId: lastLog.competitorId,
+    competitorName: lastLog.competitorName,
+    isRerun: lastLog.isRerun,
+    rerunReason: lastLog.rerunReason,
+    notes: "",
     action: "UNDO"
   });
 
-  await fetch(API_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded"
-    },
-    body: params.toString()
-  });
+  navigator.sendBeacon(
+    API_URL,
+    new Blob([params.toString()], {
+      type: "application/x-www-form-urlencoded"
+    })
+  );
 
   statusText.textContent = "Last entry undone";
-  recomputeProgression();
+
+  setTimeout(() => {
+    recomputeProgression();
+  }, 800);
 };
   
 /* ================= BOOT ================= */
