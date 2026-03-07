@@ -118,8 +118,13 @@ const RERUN_GID=110041342;
 
 /* AUTH */
 const params = new URLSearchParams(location.search);
-const logger = params.get("logger");
-const token  = params.get("token");
+
+let logger = params.get("logger");
+let token  = params.get("token");
+
+/* fallback for testing */
+if (!logger) logger = "Andrew";
+if (!token) token = "ABC123";
 
 /* STATE */
 let competitors=[], index=0, completed={}, lastLog=null, eventOpen=true;
