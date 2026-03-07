@@ -107,7 +107,7 @@ button.log{
 <script>
 /* ================= CONFIG ================= */
 const SHEET_ID="1EsFTZZkAbdVCYu8wT_gR2V_l_knRAGSmD0F5X0PA3rE";
-const API_URL="https://script.googleusercontent.com/macros/echo?user_content_key=AY5xjrSHNCr2t9zxqI3mHzNkXP7opJ_Vx5J-kYWwNjQYSKka_zAt8ZkvMk7lnKhVE4XLPRiIgNqgkv4wz2q_Ag9BngkPsKyqzAWN_nPlq22Q-GATKScYr-7UHU8kdXNiDDizKUWhsdbyymo70m9sf8HMpDPPdlOBYG0C7jNHx8EA_mEHy8pDKdspkmEFFbIxCjnDxBVr9T702Ucz_kwwV0URKcDAfHvQ6Xr6qKSyU6wTCN2COh9xQSAH-5FGPNK7m_QheXgx7OB3iLEne8nHd7YFNio8zDPIQn4yZqLuw1qhL_Bb38ZwVGlfsThInYSITVUqOdx1gIVPpzIkiSCMrU45g44zEN8vuvJhgeThe4qaNx6joedbWNxdX_uEO7xTL2e7aH--XdXUM8KuERZ4p3I&lib=M4KrMbbCNQ-ANanHQ6kpH91iqQsmML4C5";
+const API_URL="https://script.google.com/macros/s/AKfycbzIKGqLMHZL81NBZo6EndIRSiQcN3sVe0H44CmsDE8LnP_Yfc92CApePKkWbJo7Tw4tww/exec";
 
 const EVENTCONFIG_GID=0;
 const EVENTS_GID=1157267667;
@@ -253,18 +253,19 @@ logBtn.onclick = () => {
     action: "LOG"
   });
 
-  const url = API_URL + "&" + params.toString();
+  const url = API_URL + "?" + params.toString();
 
   startCountdown();
   statusText.textContent = "Logged";
 
-  window.loggerPing = new Image();
-  window.loggerPing.src = url;
+  fetch(url, {
+    method: "GET",
+    mode: "no-cors"
+  });
 
   setTimeout(() => {
     recomputeProgression();
   }, 800);
-
 };
   
 /* ================= UNDO ================= */
