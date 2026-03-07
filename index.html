@@ -228,54 +228,69 @@ function startCountdown(){
 }
 
 /* ================= LOG ================= */
-logBtn.onclick = () => {
+logBtn.onclick = async () => {
+
+  if (!eventOpen) return;
 
   const c = competitors[index];
   if (!c) return;
 
-  const url =
-    API_URL +
-    "?logger=" + encodeURIComponent(logger) +
-    "&token=" + encodeURIComponent(token) +
-    "&event=" + encodeURIComponent(eventSelect.value) +
-    "&round=" + encodeURIComponent(roundSelect.value) +
-    "&competitorId=" + encodeURIComponent(c.number) +
-    "&competitorName=" + encodeURIComponent(c.name) +
-    "&isRerun=" + encodeURIComponent(rerunChk.checked ? "YES" : "NO") +
-    "&rerunReason=" + encodeURIComponent(rerunChk.checked ? rerunReason.value : "") +
-    "&notes=" +
-    "&action=LOG";
+  const params = new URLSearchParams({
+    logger: logger,
+    token: token,
+    event: eventSelect.value,
+    round: roundSelect.value,
+    competitorId: c.number,
+    competitorName: c.name,
+    isRerun: rerunChk.checked ? "YES" : "NO",
+    rerunReason: rerunChk.checked ? rerunReason.value : "",
+    notes: "",
+    action: "LOG"
+  });
 
   startCountdown();
   statusText.textContent = "Logged";
 
-  new Image().src = url;
+  try {
+    await fetch(API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded"
+      },
+      body: params.toString()
+    });
+
+    recomputeProgression();
+
+  } catch (err) {
+    statusText.textContent = "Logging failed";
+    console.error(err);
+  }
+
 };
   
 /* ================= UNDO ================= */
-undoBtn.onclick = () => {
+undoBtn.onclick = async () => {
 
   if (!lastLog) return;
 
-  const url =
-    API_URL +
-    "?logger=" + encodeURIComponent(lastLog.logger) +
-    "&token=" + encodeURIComponent(lastLog.token) +
-    "&event=" + encodeURIComponent(lastLog.event) +
-    "&round=" + encodeURIComponent(lastLog.round) +
-    "&competitorId=" + encodeURIComponent(lastLog.competitorId) +
-    "&competitorName=" + encodeURIComponent(lastLog.competitorName) +
-    "&isRerun=" + encodeURIComponent(lastLog.isRerun) +
-    "&rerunReason=" + encodeURIComponent(lastLog.rerunReason) +
-    "&notes=" +
-    "&action=UNDO";
+  const params = new URLSearchParams({
+    ...lastLog,
+    action: "UNDO"
+  });
 
-  new Image().src = url;
+  await fetch(API_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded"
+    },
+    body: params.toString()
+  });
 
   statusText.textContent = "Last entry undone";
   recomputeProgression();
 };
-
+  
 /* ================= BOOT ================= */
 (async()=>{
   await loadEventConfig();
@@ -285,22 +300,7 @@ undoBtn.onclick = () => {
   await loadCompetitors();
   await recomputeProgression();
 })();
+  
 </script>
-
-<form id="logForm" method="POST" target="hiddenFrame" action="https://script.google.com/macros/s/AKfycbzeePf8VgIRmOs0vaeIvydBX2OndITMPInMmc3izKC9sYqFpLCsejWmCc6wCLjfkVBYGg/exec">
-  <input type="hidden" name="logger">
-  <input type="hidden" name="token">
-  <input type="hidden" name="event">
-  <input type="hidden" name="round">
-  <input type="hidden" name="competitorId">
-  <input type="hidden" name="competitorName">
-  <input type="hidden" name="isRerun">
-  <input type="hidden" name="rerunReason">
-  <input type="hidden" name="notes">
-  <input type="hidden" name="action">
-</form>
-
-<iframe name="hiddenFrame" style="display:none;"></iframe>
-
 </body>
 </html>
