@@ -263,17 +263,20 @@ logBtn.onclick = () => {
   startCountdown();
   statusText.textContent = "Logged";
 
-  navigator.sendBeacon(
-    API_URL,
-    new Blob([params.toString()], {
-      type: "application/x-www-form-urlencoded"
-    })
-  );
+  /* send log */
+  window.loggerPing = new Image();
+  window.loggerPing.src = url;
 
+  /* advance competitor immediately */
+  if (index < competitors.length - 1) {
+    index++;
+    showCompetitor();
+  }
+
+  /* refresh sheet in background */
   setTimeout(() => {
     recomputeProgression();
-  }, 800);
-
+  }, 4000);
 };
   
 /* ================= UNDO ================= */
@@ -303,9 +306,16 @@ undoBtn.onclick = () => {
 
   statusText.textContent = "Last entry undone";
 
+  /* step back one competitor */
+  if (index > 0) {
+    index--;
+    showCompetitor();
+  }
+
+  /* verify with sheet */
   setTimeout(() => {
     recomputeProgression();
-  }, 800);
+  }, 3000);
 };
   
 /* ================= BOOT ================= */
