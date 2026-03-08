@@ -264,8 +264,12 @@ logBtn.onclick = () => {
   statusText.textContent = "Logged";
 
   /* send log */
-  window.loggerPing = new Image();
-  window.loggerPing.src = url;
+  navigator.sendBeacon(
+    API_URL,
+    new Blob([params.toString()], {
+      type: "application/x-www-form-urlencoded"
+    })
+  );
 
   /* advance competitor immediately */
   if (index < competitors.length - 1) {
