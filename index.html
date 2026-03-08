@@ -250,7 +250,8 @@ logBtn.onclick = () => {
     isRerun: rerunChk.checked ? "YES" : "NO",
     rerunReason: rerunChk.checked ? rerunReason.value : "",
     notes: "",
-    action: "LOG"
+    action: "LOG",
+    r: Date.now()
   });
 
   lastLog = {
